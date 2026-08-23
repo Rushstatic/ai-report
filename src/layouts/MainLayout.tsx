@@ -17,6 +17,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation, TranslationKey } from '@/locales/translations';
+import { useAuth } from '@/hooks/useAuth';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -36,6 +37,7 @@ export default function MainLayout() {
   const location = useLocation();
   const { language, setLanguage } = useLanguageStore();
   const t = useTranslation(language);
+  const { employee, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] font-sans flex flex-col lg:flex-row overflow-hidden">
@@ -76,11 +78,16 @@ export default function MainLayout() {
           </nav>
           <div className="p-4 border-t border-slate-700">
             <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">DC</div>
-              <div>
-                <p className="text-xs font-semibold text-white">Dr. Ashok Patil</p>
-                <p className="text-[10px] text-slate-400">District Controller</p>
+              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">
+                {employee?.name?.charAt(0) || 'U'}
               </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-white">{employee?.name || 'User'}</p>
+                <p className="text-[10px] text-slate-400">{employee?.employee_type?.replace('_', ' ') || 'Guest'}</p>
+              </div>
+              <button onClick={() => signOut()} className="p-2 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors" title="Log out">
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -115,11 +122,16 @@ export default function MainLayout() {
         </nav>
         <div className="p-4 border-t border-slate-700">
           <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-lg">
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">DC</div>
-            <div>
-              <p className="text-xs font-semibold text-white">Dr. Ashok Patil</p>
-              <p className="text-[10px] text-slate-400">District Controller</p>
+            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">
+              {employee?.name?.charAt(0) || 'U'}
             </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-xs font-semibold text-white truncate">{employee?.name || 'User'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{employee?.employee_type?.replace('_', ' ') || 'Guest'}</p>
+            </div>
+            <button onClick={() => signOut()} className="p-2 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors" title="Log out">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

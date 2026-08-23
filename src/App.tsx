@@ -5,16 +5,33 @@
 
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { isSupabaseConfigured } from './lib/supabase';
+import { useAuth } from './hooks/useAuth';
 import SetupInstructions from './components/SetupInstructions';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './features/dashboard/Dashboard';
 import FormBuilder from './features/forms/FormBuilder';
 import ReportSubmission from './features/reports/ReportSubmission';
 import MyReports from './features/reports/MyReports';
+import Login from './features/auth/Login';
+import { Loader2 } from 'lucide-react';
 
 export default function App() {
+  const { session, initialized } = useAuth();
+
   if (!isSupabaseConfigured()) {
     return <SetupInstructions />;
+  }
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F1F5F9]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login />;
   }
 
   return (

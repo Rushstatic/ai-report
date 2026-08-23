@@ -1,6 +1,9 @@
 import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function SetupInstructions() {
+  const urlStatus = import.meta.env.VITE_SUPABASE_URL ? "Provided" : "Missing";
+  const keyStatus = import.meta.env.VITE_SUPABASE_ANON_KEY ? "Provided" : "Missing";
+
   return (
     <div className="min-h-screen bg-[#F1F5F9] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-3xl">
@@ -38,6 +41,9 @@ VITE_SUPABASE_ANON_KEY="your-anon-key"
             </div>
             
             <div className="pt-4 border-t">
+              <p className="text-sm text-gray-500 font-mono mb-2">
+                Build Status: URL is <strong>{urlStatus}</strong> | Key is <strong>{keyStatus}</strong>
+              </p>
               <p className="text-sm text-gray-500">
                 After adding the secrets, restart your development server or refresh the page.
               </p>
