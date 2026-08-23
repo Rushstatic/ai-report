@@ -13,10 +13,11 @@ import FormBuilder from './features/forms/FormBuilder';
 import ReportSubmission from './features/reports/ReportSubmission';
 import MyReports from './features/reports/MyReports';
 import Login from './features/auth/Login';
+import ChangePassword from './features/auth/ChangePassword';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
-  const { session, initialized } = useAuth();
+  const { session, initialized, needsPasswordChange } = useAuth();
 
   if (!isSupabaseConfigured()) {
     return <SetupInstructions />;
@@ -32,6 +33,10 @@ export default function App() {
 
   if (!session) {
     return <Login />;
+  }
+  
+  if (needsPasswordChange) {
+    return <ChangePassword />;
   }
 
   return (

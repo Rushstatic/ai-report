@@ -12,8 +12,9 @@ interface AuthState {
   loading: boolean;
   initialized: boolean;
   error: string | null;
-  signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  needsPasswordChange: boolean;
+  loginWithPassword: (phone: string, pass: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPass: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   initializeAuth: () => void;
 }
@@ -25,37 +26,53 @@ export const useAuth = create<AuthState>((set, get) => ({
   loading: false,
   initialized: false,
   error: null,
+  needsPasswordChange: false,
 
-  signInWithOtp: async (phone: string) => {
+  loginWithPassword: async (phone: string, pass: string) => {
     if (!isSupabaseConfigured()) {
       return { error: new Error('Supabase is not configured') };
     }
     
     set({ loading: true, error: null });
-    // Default to +91 (India) if no country code is provided, customize as needed
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
     
-    const { error } = await supabase.auth.signInWithOtp({
+    let { data, error } = await supabase.auth.signInWithPassword({
       phone: formattedPhone,
+      password: pass,
     });
+
+    // If login fails, and they are using the default password, try signing them up automatically
+    if (error && pass === '123456') {
+      const signUpRes = await supabase.auth.signUp({
+        phone: formattedPhone,
+        password: pass,
+      });
+      data = signUpRes.data;
+      error = signUpRes.error;
+    }
     
+    if (!error && data.session) {
+      const isDefault = pass === '123456';
+      set({ needsPasswordChange: isDefault });
+      if (isDefault) {
+        localStorage.setItem('needsPasswordChange', 'true');
+      } else {
+        localStorage.removeItem('needsPasswordChange');
+      }
+    }
+
     set({ loading: false, error: error?.message || null });
     return { error };
   },
 
-  verifyOtp: async (phone: string, token: string) => {
-    if (!isSupabaseConfigured()) {
-      return { error: new Error('Supabase is not configured') };
-    }
-
+  updatePassword: async (newPass: string) => {
     set({ loading: true, error: null });
-    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-
-    const { error } = await supabase.auth.verifyOtp({
-      phone: formattedPhone,
-      token,
-      type: 'sms',
-    });
+    const { error } = await supabase.auth.updateUser({ password: newPass });
+    
+    if (!error) {
+      set({ needsPasswordChange: false });
+      localStorage.removeItem('needsPasswordChange');
+    }
     
     set({ loading: false, error: error?.message || null });
     return { error };
@@ -66,7 +83,8 @@ export const useAuth = create<AuthState>((set, get) => ({
     
     set({ loading: true });
     await supabase.auth.signOut();
-    set({ session: null, user: null, employee: null, loading: false });
+    localStorage.removeItem('needsPasswordChange');
+    set({ session: null, user: null, employee: null, loading: false, needsPasswordChange: false });
   },
 
   initializeAuth: () => {
@@ -75,11 +93,13 @@ export const useAuth = create<AuthState>((set, get) => ({
       return;
     }
 
+    const needsPasswordChange = localStorage.getItem('needsPasswordChange') === 'true';
+    set({ needsPasswordChange });
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
-        // Fetch the corresponding employee profile from the database
         supabase
           .from('employees')
           .select('*')
@@ -92,7 +112,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       }
     });
 
-    // Listen for auth state changes (e.g. login, logout)
+    // Listen for auth state changes
     supabase.auth.onAuthStateChange((_event, session) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
