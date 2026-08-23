@@ -1,0 +1,32 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { isSupabaseConfigured } from './lib/supabase';
+import SetupInstructions from './components/SetupInstructions';
+import MainLayout from './layouts/MainLayout';
+import Dashboard from './features/dashboard/Dashboard';
+import FormBuilder from './features/forms/FormBuilder';
+import ReportSubmission from './features/reports/ReportSubmission';
+
+export default function App() {
+  if (!isSupabaseConfigured()) {
+    return <SetupInstructions />;
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="forms/builder" element={<FormBuilder />} />
+          <Route path="reports/submit/:formId" element={<ReportSubmission />} />
+          {/* Add other routes here */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
