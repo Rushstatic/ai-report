@@ -15,23 +15,27 @@ import {
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useLanguageStore } from '@/store/languageStore';
+import { useTranslation, TranslationKey } from '@/locales/translations';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'My Reports', href: '/reports/my', icon: FileText },
-  { name: 'Pending Reports', href: '/reports/pending', icon: CheckSquare },
-  { name: 'Form Builder', href: '/forms/builder', icon: Settings },
-  { name: 'Employees', href: '/employees', icon: Users },
-  { name: 'Hierarchy', href: '/hierarchy', icon: MapPin },
+  { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
+  { nameKey: 'nav.myReports', href: '/reports/my', icon: FileText },
+  { nameKey: 'nav.pendingReports', href: '/reports/pending', icon: CheckSquare },
+  { nameKey: 'nav.formBuilder', href: '/forms/builder', icon: Settings },
+  { nameKey: 'nav.employees', href: '/employees', icon: Users },
+  { nameKey: 'nav.hierarchy', href: '/hierarchy', icon: MapPin },
 ];
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { language, setLanguage } = useLanguageStore();
+  const t = useTranslation(language);
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] font-sans flex flex-col lg:flex-row overflow-hidden">
@@ -41,8 +45,8 @@ export default function MainLayout() {
         <div className="fixed inset-y-0 left-0 w-64 bg-[#0F172A] text-white flex flex-col">
           <div className="p-6 border-b border-slate-700 flex justify-between items-center">
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-blue-400">DHMS PORTAL</h1>
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">District Health Monitoring</p>
+              <h1 className="text-xl font-bold tracking-tight text-blue-400">{t('header.title')}</h1>
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">{t('header.subtitle')}</p>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="text-slate-400">
               <X className="w-6 h-6" />
@@ -53,7 +57,7 @@ export default function MainLayout() {
               const isActive = location.pathname === item.href;
               return (
                 <Link
-                  key={item.name}
+                  key={item.nameKey}
                   to={item.href}
                   className={cn(
                     isActive ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800",
@@ -65,7 +69,7 @@ export default function MainLayout() {
                     isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100",
                     "mr-3 flex-shrink-0 h-5 w-5"
                   )} />
-                  <span className="text-sm font-medium">{item.name}</span>
+                  <span className="text-sm font-medium">{t(item.nameKey as TranslationKey)}</span>
                 </Link>
               );
             })}
@@ -85,15 +89,15 @@ export default function MainLayout() {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:bg-[#0F172A] lg:text-white">
         <div className="p-6 border-b border-slate-700">
-          <h1 className="text-xl font-bold tracking-tight text-blue-400">DHMS PORTAL</h1>
-          <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">District Health Monitoring</p>
+          <h1 className="text-xl font-bold tracking-tight text-blue-400">{t('header.title')}</h1>
+          <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">{t('header.subtitle')}</p>
         </div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
-                key={item.name}
+                key={item.nameKey}
                 to={item.href}
                 className={cn(
                   isActive ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800",
@@ -104,7 +108,7 @@ export default function MainLayout() {
                   isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100",
                   "flex-shrink-0 h-5 w-5"
                 )} />
-                <span className="text-sm font-medium">{item.name}</span>
+                <span className="text-sm font-medium">{t(item.nameKey as TranslationKey)}</span>
               </Link>
             );
           })}
@@ -131,19 +135,29 @@ export default function MainLayout() {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <span className="text-slate-500 font-medium hidden sm:inline-block">Latur District</span>
+            <span className="text-slate-500 font-medium hidden sm:inline-block">{t('header.district')}</span>
             <div className="hidden sm:block h-4 w-[1px] bg-slate-300"></div>
             <span className="text-sm text-slate-400 italic font-serif hidden sm:inline-block">जिल्हा आरोग्य अहवाल व संनियंत्रण</span>
             <span className="text-slate-800 font-medium sm:hidden">DHMS</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="hidden sm:flex bg-slate-100 p-1 rounded-md text-[11px] font-bold">
-              <button className="px-3 py-1 bg-white shadow-sm rounded text-slate-800">EN</button>
-              <button className="px-3 py-1 text-slate-500">मराठी</button>
+              <button 
+                onClick={() => setLanguage('en')}
+                className={cn("px-3 py-1 rounded transition-colors", language === 'en' ? "bg-white shadow-sm text-slate-800" : "text-slate-500")}
+              >
+                EN
+              </button>
+              <button 
+                onClick={() => setLanguage('mr')}
+                className={cn("px-3 py-1 rounded transition-colors", language === 'mr' ? "bg-white shadow-sm text-slate-800" : "text-slate-500")}
+              >
+                मराठी
+              </button>
             </div>
             <div className="relative flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-full text-blue-700 text-xs font-bold border border-blue-100">
               <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
-              <span className="hidden sm:inline-block">Monthly Report Active</span>
+              <span className="hidden sm:inline-block">{t('header.activeStatus')}</span>
               <span className="sm:hidden">Active</span>
             </div>
           </div>

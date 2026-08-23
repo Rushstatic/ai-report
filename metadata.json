@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "District Health Reporting System",
+  "description": "A comprehensive system for monitoring and reporting district health metrics.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

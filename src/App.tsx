@@ -10,6 +10,7 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './features/dashboard/Dashboard';
 import FormBuilder from './features/forms/FormBuilder';
 import ReportSubmission from './features/reports/ReportSubmission';
+import MyReports from './features/reports/MyReports';
 
 export default function App() {
   if (!isSupabaseConfigured()) {
@@ -21,6 +22,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="reports/my" element={<MyReports />} />
           <Route path="forms/builder" element={<FormBuilder />} />
           <Route path="reports/submit/:formId" element={<ReportSubmission />} />
           {/* Add other routes here */}
