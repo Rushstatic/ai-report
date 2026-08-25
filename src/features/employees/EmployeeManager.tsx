@@ -32,7 +32,7 @@ export default function EmployeeManager() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [employee, isDistrictController, isTalukaController, isPHCController]);
 
   async function fetchData() {
     setLoading(true);
@@ -42,7 +42,7 @@ export default function EmployeeManager() {
       let phcQuery = supabase.from('phcs').select('*');
       let scQuery = supabase.from('sub_centres').select('*');
 
-      if (isTalukaController && employee.taluka_id) {
+      if (isTalukaController && employee?.taluka_id) {
         empQuery = empQuery.eq('taluka_id', employee.taluka_id);
         talQuery = talQuery.eq('id', employee.taluka_id);
         phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
@@ -54,11 +54,17 @@ export default function EmployeeManager() {
         } else {
           scQuery = scQuery.eq('phc_id', '00000000-0000-0000-0000-000000000000');
         }
-      } else if (isPHCController && employee.phc_id) {
+      } else if (isPHCController && employee?.phc_id) {
         empQuery = empQuery.eq('phc_id', employee.phc_id);
         talQuery = talQuery.eq('id', employee.taluka_id || '00000000-0000-0000-0000-000000000000');
         phcQuery = phcQuery.eq('id', employee.phc_id);
         scQuery = scQuery.eq('phc_id', employee.phc_id);
+      } else if (!isDistrictController && !isTalukaController && !isPHCController) {
+        // Sub-centre staff
+        empQuery = empQuery.eq('sub_centre_id', employee?.sub_centre_id || '00000000-0000-0000-0000-000000000000');
+        talQuery = talQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+        phcQuery = phcQuery.eq('id', employee?.phc_id || '00000000-0000-0000-0000-000000000000');
+        scQuery = scQuery.eq('id', employee?.sub_centre_id || '00000000-0000-0000-0000-000000000000');
       }
 
       const [empRes, talRes, phcRes, scRes] = await Promise.all([

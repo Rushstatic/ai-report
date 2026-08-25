@@ -2,6 +2,7 @@ export const translations = {
   en: {
     // Navigation
     'nav.dashboard': 'Dashboard',
+    'nav.dataEntry': 'Data Entry (Submit Form)',
     'nav.myReports': 'My Reports',
     'nav.pendingReports': 'Pending Reports',
     'nav.formBuilder': 'Form Builder',
@@ -50,6 +51,7 @@ export const translations = {
   mr: {
     // Navigation
     'nav.dashboard': 'डॅशबोर्ड',
+    'nav.dataEntry': 'डेटा एन्ट्री (अहवाल भरा)',
     'nav.myReports': 'माझे अहवाल',
     'nav.pendingReports': 'प्रलंबित अहवाल',
     'nav.formBuilder': 'फॉर्म बिल्डर',

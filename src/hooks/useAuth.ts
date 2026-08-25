@@ -23,6 +23,61 @@ interface AuthState {
   updatePassword: (newPass: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   initializeAuth: () => void;
+  refreshEmployee: () => Promise<void>;
+}
+
+async function resolveEmployeeRecord(userId: string, phoneStr?: string | null): Promise<EmployeeRelation | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    // 1. Try finding by user_id
+    const { data: byUserId } = await (supabase
+      .from('employees') as any)
+      .select('*, phcs(name), sub_centres(name), talukas(name)')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (byUserId) {
+      return byUserId;
+    }
+
+    // 2. If not found by user_id, search by mobile number variants
+    if (phoneStr) {
+      const cleanPhone = phoneStr.replace(/^\+91/, '').replace(/^\+/, '').trim();
+      const phoneVariants = [
+        phoneStr,
+        cleanPhone,
+        `+91${cleanPhone}`,
+        `91${cleanPhone}`,
+        `0${cleanPhone}`
+      ];
+
+      const { data: byPhoneList } = await (supabase
+        .from('employees') as any)
+        .select('*, phcs(name), sub_centres(name), talukas(name)')
+        .in('mobile_number', phoneVariants)
+        .limit(1);
+
+      const byPhone = byPhoneList?.[0];
+
+      if (byPhone) {
+        // Link user_id in database so future queries are instant
+        try {
+          await (supabase.from('employees') as any)
+            .update({ user_id: userId })
+            .eq('id', byPhone.id);
+        } catch {
+          // ignore update errors if any
+        }
+
+        return { ...byPhone, user_id: userId };
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error("Error resolving employee record:", err);
+    return null;
+  }
 }
 
 export const useAuth = create<AuthState>((set, get) => ({
@@ -33,6 +88,15 @@ export const useAuth = create<AuthState>((set, get) => ({
   initialized: false,
   error: null,
   needsPasswordChange: false,
+
+  refreshEmployee: async () => {
+    const { user } = get();
+    if (!user) return;
+    const emp = await resolveEmployeeRecord(user.id, user.phone);
+    if (emp) {
+      set({ employee: emp });
+    }
+  },
 
   loginWithPassword: async (phone: string, pass: string) => {
     if (!isSupabaseConfigured()) {
@@ -59,12 +123,16 @@ export const useAuth = create<AuthState>((set, get) => ({
     
     if (!error && data.session) {
       const isDefault = pass === '123456';
-      set({ needsPasswordChange: isDefault });
+      set({ needsPasswordChange: isDefault, session: data.session, user: data.session.user });
       if (isDefault) {
         localStorage.setItem('needsPasswordChange', 'true');
       } else {
         localStorage.removeItem('needsPasswordChange');
       }
+
+      // Immediately resolve employee
+      const emp = await resolveEmployeeRecord(data.session.user.id, formattedPhone);
+      set({ employee: emp });
     }
 
     set({ loading: false, error: error?.message || null });
@@ -106,16 +174,8 @@ export const useAuth = create<AuthState>((set, get) => ({
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
-        try {
-          const { data } = await supabase
-            .from('employees')
-            .select('*, phcs(name), sub_centres(name)')
-            .eq('user_id', session.user.id)
-            .single();
-          set({ employee: data as any });
-        } catch {
-          // ignore
-        }
+        const emp = await resolveEmployeeRecord(session.user.id, session.user.phone);
+        set({ employee: emp });
       }
       set({ initialized: true });
     });
@@ -124,12 +184,8 @@ export const useAuth = create<AuthState>((set, get) => ({
     supabase.auth.onAuthStateChange(async (_event, session) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
-        const { data } = await supabase
-          .from('employees')
-          .select('*, phcs(name), sub_centres(name)')
-          .eq('user_id', session.user.id)
-          .single();
-        set({ employee: data as any });
+        const emp = await resolveEmployeeRecord(session.user.id, session.user.phone);
+        set({ employee: emp });
       } else {
         set({ employee: null });
       }
@@ -139,3 +195,4 @@ export const useAuth = create<AuthState>((set, get) => ({
 
 // Auto-initialize the auth listener when the hook is first imported
 useAuth.getState().initializeAuth();
+

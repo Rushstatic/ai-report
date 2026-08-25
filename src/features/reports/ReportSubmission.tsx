@@ -123,11 +123,98 @@ export default function ReportSubmission() {
           }
         }
 
-        // Fallback form if not found
+        // Fallback form if not found in db
         if (!formObj) {
-          formObj = {
+          const roleFormTemplates: Record<string, any> = {
+            'f-malaria-mpw': {
+              id: 'f-malaria-mpw',
+              name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप व किटकजन्य रोग साप्ताहिक अहवाल)',
+              description: 'BSER, fever cases, blood slide collection, and vector control field log.',
+              reporting_period: 'Weekly',
+              target_role: 'MPW',
+              fields: [
+                { id: 'f1', name: 'fever_cases_total', label_en: 'Total Fever Cases Examined', label_mr: 'तपासलेले एकूण तापाचे रुग्ण', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'bs_collected', label_en: 'Blood Smears (BS) Collected', label_mr: 'घेतलेले रक्त नमुने (BS)', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'rdt_performed', label_en: 'Malaria Rapid Tests (RDT) Done', label_mr: 'मलेरिया जलद निदान चाचण्या (RDT)', field_type: 'Number', is_required: false },
+                { id: 'f4', name: 'malaria_positive', label_en: 'Malaria Positive Cases (Pv / Pf)', label_mr: 'मलेरिया बाधित रुग्ण (Pv / Pf)', field_type: 'Number', is_required: true },
+                { id: 'f5', name: 'dengue_suspects', label_en: 'Suspected Dengue / Chikungunya Cases', label_mr: 'संशयित डेंग्यू / चिकनगुनिया रुग्ण', field_type: 'Number', is_required: false },
+                { id: 'f6', name: 'tethis_wells_checked', label_en: 'Guppy Fish Release / Water Bodies Checked', label_mr: 'गप्पी मासे सोडलेली / तपासलेली जलसाठे', field_type: 'Number', is_required: false },
+              ]
+            },
+            'f-water-mpw': {
+              id: 'f-water-mpw',
+              name: 'Drinking Water Quality & TCL Testing Log (पिण्याचे पाणी व टीसीएल क्लोरीनेशन नोंद)',
+              description: 'OT test, chlorination levels in village water tanks, and sanitary survey.',
+              reporting_period: 'Weekly',
+              target_role: 'MPW',
+              fields: [
+                { id: 'f1', name: 'sources_inspected', label_en: 'Water Sources Inspected', label_mr: 'तपासलेले एकूण पिण्याच्या पाण्याचे स्त्रोत', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'ot_tests_positive', label_en: 'OT Tests Positive (Proper Chlorine)', label_mr: 'ओटी टेस्ट योग्य आढळलेले नमुने (योग्य क्लोरिन)', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'ot_tests_zero', label_en: 'OT Tests Zero (Nil Chlorine)', label_mr: 'ओटी टेस्ट निरंक आढळलेले नमुने (क्लोरिन नसलेले)', field_type: 'Number', is_required: true },
+                { id: 'f4', name: 'tcl_sample_collected', label_en: 'TCL Powder Samples Sent for Testing', label_mr: 'प्रयोगशाळेत तपासणीस पाठवलेले टीसीएल नमुने', field_type: 'Number', is_required: false },
+              ]
+            },
+            'f-rch-anm': {
+              id: 'f-rch-anm',
+              name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन मासिक प्रगती अहवाल)',
+              description: 'ANC 1st trimester, high-risk pregnancies, institutional deliveries, and PNC.',
+              reporting_period: 'Monthly',
+              target_role: 'ANM',
+              fields: [
+                { id: 'f1', name: 'anc_total_registered', label_en: 'Total Pregnant Women Registered', label_mr: 'नोंदणीकृत एकूण गरोदर माता', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'anc_1st_trimester', label_en: 'ANC Registered within 12 Weeks (1st Trimester)', label_mr: 'पहिल्या ३ महिन्यात (१२ आठवड्यात) नोंदणी', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'high_risk_pregnancies', label_en: 'High Risk Pregnancies (HRP) Tracked', label_mr: 'जोखीमयुक्त गरोदर माता (HRP) शोध व पाठपुरावा', field_type: 'Number', is_required: true },
+                { id: 'f4', name: 'institutional_deliveries', label_en: 'Institutional Deliveries (Govt/Pvt)', label_mr: 'संस्थात्मक प्रसूती (शासकीय/खाजगी)', field_type: 'Number', is_required: true },
+                { id: 'f5', name: 'pnc_48_hrs_visits', label_en: 'PNC Visits Completed within 48 Hours', label_mr: 'प्रसूतीनंतर ४८ तासांत तपासणी पूर्ण', field_type: 'Number', is_required: false },
+              ]
+            },
+            'f-immunization-anm': {
+              id: 'f-immunization-anm',
+              name: 'Routine Immunization & Session Site Report (नियमित लसीकरण व सत्र अहवाल)',
+              description: 'Infant vaccines (BCG, Penta, MR), dropout tracking, and RI session performance.',
+              reporting_period: 'Monthly',
+              target_role: 'ANM',
+              fields: [
+                { id: 'f1', name: 'sessions_planned', label_en: 'RI Sessions Planned', label_mr: 'नियोजित लसीकरण सत्रे', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'sessions_held', label_en: 'RI Sessions Actually Held', label_mr: 'प्रत्यक्ष पार पडलेली सत्रे', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'bcg_given', label_en: 'BCG Given to Newborns', label_mr: 'BCG लस दिलेले बालके', field_type: 'Number', is_required: true },
+                { id: 'f4', name: 'pentavalent_3', label_en: 'Pentavalent-3 / Rotavirus-3 Completed', label_mr: 'पेंटाव्हॅलेंट-३ पूर्ण केलेली बालके', field_type: 'Number', is_required: true },
+                { id: 'f5', name: 'mr_1st_dose', label_en: 'MR 1st Dose (9-12 Months)', label_mr: 'गोवर-रुबेला (MR) पहिली मात्रा पूर्ण', field_type: 'Number', is_required: true },
+                { id: 'f6', name: 'fully_immunized', label_en: 'Fully Immunized Children (0-1 Year)', label_mr: 'पूर्ण लसीकरण झालेली बालके (०-१ वर्ष)', field_type: 'Number', is_required: true },
+              ]
+            },
+            'f-ncd-cho': {
+              id: 'f-ncd-cho',
+              name: 'HWC NCD Screening & Teleconsultation Log (NCD असंसर्गजन्य रोग तपासणी व टेलीमेडिसिन)',
+              description: 'Hypertension, Diabetes, Cancer screening (30+ pop) and e-Sanjeevani teleconsults.',
+              reporting_period: 'Monthly',
+              target_role: 'CHO',
+              fields: [
+                { id: 'f1', name: 'cbac_forms_filled', label_en: 'CBAC Forms Filled (Age 30+)', label_mr: 'भरलेले सीबॅक (CBAC) फॉर्म (वय ३०+)', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'screened_hypertension', label_en: 'Individuals Screened for Hypertension (BP)', label_mr: 'रक्तदाब तपासणी केलेले व्यक्ती', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'screened_diabetes', label_en: 'Individuals Screened for Diabetes (Blood Sugar)', label_mr: 'मधुमेह (Blood Sugar) तपासलेले व्यक्ती', field_type: 'Number', is_required: true },
+                { id: 'f4', name: 'oral_cancer_screened', label_en: 'Oral / Breast / Cervical Cancer Screenings', label_mr: 'कर्करोग (कॅन्सर) पूर्व तपासणी', field_type: 'Number', is_required: false },
+                { id: 'f5', name: 'teleconsultations_done', label_en: 'e-Sanjeevani Teleconsultations Completed', label_mr: 'ई-संजीवनी द्वारे तज्ज्ञ डॉक्टरांशी सल्लामसलत', field_type: 'Number', is_required: true },
+              ]
+            },
+            'f-wellness-cho': {
+              id: 'f-wellness-cho',
+              name: 'HWC Wellness Activities & Community Health Day (आरोग्य वर्धिनी वेलनेस व योग सत्र)',
+              description: 'Yoga sessions, VHSNC meetings, adolescent health days, and wellness log.',
+              reporting_period: 'Monthly',
+              target_role: 'CHO',
+              fields: [
+                { id: 'f1', name: 'yoga_sessions', label_en: 'Yoga / Physical Activity Sessions Conducted', label_mr: 'पार पडलेले योग व व्यायाम सत्रे', field_type: 'Number', is_required: true },
+                { id: 'f2', name: 'participants_wellness', label_en: 'Total Participants in Wellness Sessions', label_mr: 'वेलनेस सत्रातील एकूण सहभागी नागरिक', field_type: 'Number', is_required: true },
+                { id: 'f3', name: 'vhsnc_meetings', label_en: 'VHSNC Meetings Attended', label_mr: 'ग्राम आरोग्य पाणीपुरवठा व स्वच्छता समिती (VHSNC) बैठका', field_type: 'Number', is_required: false },
+                { id: 'f4', name: 'jashn_e_zindagi', label_en: 'Health Promotion & Awareness Days Observed', label_mr: 'आरोग्य दिन व जनजागृती कार्यक्रम', field_type: 'Number', is_required: false },
+              ]
+            }
+          };
+
+          formObj = (formId && roleFormTemplates[formId]) ? roleFormTemplates[formId] : {
             id: formId || 'default-form',
-            name: 'Monthly Sub-centre Report (मासिक उपकेंद्र अहवाल)',
+            name: 'Monthly Sub-centre Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)',
             description: 'Please enter the accurate numerical data for your assigned sub-centre.',
             reporting_period: 'Monthly',
             report_type: 'VILLAGE_NUMERICAL',
@@ -136,7 +223,8 @@ export default function ReportSubmission() {
               { id: 'f1', name: 'fever_cases', label_en: 'Total Fever Cases', label_mr: 'एकूण तापाचे रुग्ण', field_type: 'Number', is_required: true },
               { id: 'f2', name: 'tb_suspects', label_en: 'TB Suspects Identified', label_mr: 'क्षयरोग संशयित', field_type: 'Number', is_required: true },
               { id: 'f3', name: 'anc_reg', label_en: 'New ANC Registrations', label_mr: 'नवीन माता नोंदणी', field_type: 'Number', is_required: false },
-              { id: 'f4', name: 'remarks', label_en: 'Remarks / Notes', label_mr: 'शेरा', field_type: 'Text', is_required: false },
+              { id: 'f4', name: 'immunized_count', label_en: 'Children Immunized', label_mr: 'लसीकरण केलेले बालके', field_type: 'Number', is_required: false },
+              { id: 'f5', name: 'remarks', label_en: 'Remarks / Notes', label_mr: 'शेरा व नोंदी', field_type: 'Text', is_required: false },
             ]
           };
         }

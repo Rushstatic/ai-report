@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   Building,
-  Bell
+  Bell,
+  PenSquare
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -31,6 +32,7 @@ const getNavigation = (employeeType?: string) => {
 
   const nav = [
     { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
+    { nameKey: 'nav.dataEntry', href: '/reports/entry', icon: PenSquare },
     { nameKey: 'nav.myReports', href: '/reports/my', icon: FileText },
   ];
 

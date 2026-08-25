@@ -32,7 +32,7 @@ export default function HierarchyManager() {
 
   useEffect(() => {
     fetchHierarchy();
-  }, []);
+  }, [employee, isDistrictController, isTalukaController, isPHCController]);
 
   async function fetchHierarchy() {
     setLoading(true);
@@ -74,6 +74,12 @@ export default function HierarchyManager() {
         } else {
           vilQuery = vilQuery.eq('sub_centre_id', '00000000-0000-0000-0000-000000000000');
         }
+      } else if (!isDistrictController && !isTalukaController && !isPHCController) {
+        // Staff employee (MPW / ANM / CHO): Strict Sub-centre isolation
+        talQuery = talQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+        phcQuery = phcQuery.eq('id', employee?.phc_id || '00000000-0000-0000-0000-000000000000');
+        scQuery = scQuery.eq('id', employee?.sub_centre_id || '00000000-0000-0000-0000-000000000000');
+        vilQuery = vilQuery.eq('sub_centre_id', employee?.sub_centre_id || '00000000-0000-0000-0000-000000000000');
       }
 
       const [distRes, talRes, phcRes, scRes, vilRes] = await Promise.all([

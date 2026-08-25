@@ -133,23 +133,39 @@ export default function Dashboard() {
           }
 
           // 4. Fetch Available forms assigned to this employee's role (or ALL)
-          const empRole = employee?.employee_type || 'ALL';
-          const { data: formsData } = await supabase
-            .from('forms')
+          const empRole = (employee?.employee_type || 'MPW').toUpperCase();
+          const { data: formsData } = await (supabase
+            .from('forms') as any)
             .select('*')
-            .eq('active', true)
-            .in('target_role', ['ALL', empRole, ''])
+            .or('active.is.null,active.eq.true')
             .order('name');
 
+          let matchedForms: any[] = [];
           if (formsData && formsData.length > 0) {
-            setAssignedForms(formsData);
+            matchedForms = formsData.filter((f: any) => {
+              if (!f.target_role || f.target_role === 'ALL' || f.target_role === '' || f.target_role === 'All') {
+                return true;
+              }
+              const roles = f.target_role.toUpperCase().split(/[,/| ]+/).map((r: string) => r.trim());
+              return roles.includes('ALL') || roles.includes(empRole);
+            });
+          }
+
+          if (matchedForms.length > 0) {
+            setAssignedForms(matchedForms);
           } else {
-            // Default active reports if DB empty
-            setAssignedForms([
-              { id: 'f-1', name: 'Monthly Sub-centre Report (मासिक उपकेंद्र अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ALL' },
-              { id: 'f-2', name: 'Weekly Vector Borne Disease Surveillance (हिवताप अहवाल)', reporting_period: 'Weekly', report_type: 'VILLAGE_PROGRESS', target_role: 'MPW' },
-              { id: 'f-3', name: 'Maternal & Child Health Progress (माता व बाल संगोपन)', reporting_period: 'Monthly', report_type: 'VILLAGE_PROGRESS', target_role: 'ANM' },
-            ]);
+            // Standard health worker role-specific forms
+            const defaultRoleForms: any[] = [
+              { id: 'f-monthly-sc', name: 'Monthly Sub-centre Composite Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ALL' },
+              { id: 'f-malaria-mpw', name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप अहवाल)', reporting_period: 'Weekly', report_type: 'VILLAGE_PROGRESS', target_role: 'MPW' },
+              { id: 'f-water-mpw', name: 'Drinking Water Quality & Chlorination Log (पिण्याचे पाणी तपासणी)', reporting_period: 'Weekly', report_type: 'VILLAGE_PROGRESS', target_role: 'MPW' },
+              { id: 'f-rch-anm', name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ANM' },
+              { id: 'f-immunization-anm', name: 'Routine Immunization Coverage Report (नियमित लसीकरण अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ANM' },
+              { id: 'f-ncd-cho', name: 'HWC NCD Screening & Teleconsultation Progress (NCD तपासणी व टेलीमेडिसिन)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'CHO' },
+              { id: 'f-wellness-cho', name: 'HWC Wellness Activities & Yoga Sessions (आरोग्य वर्धिनी वेलनेस नोंद)', reporting_period: 'Monthly', report_type: 'SUBCENTRE_LEVEL', target_role: 'CHO' },
+            ];
+
+            setAssignedForms(defaultRoleForms.filter(f => f.target_role === 'ALL' || f.target_role === empRole));
           }
         }
       } catch (error) {
