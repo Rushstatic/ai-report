@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Settings, Eye, Save, GripVertical, Pencil } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -30,6 +30,74 @@ export default function FormBuilder() {
   const [fields, setFields] = useState<FormField[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  
+  // Versioning state
+  const [existingForms, setExistingForms] = useState<any[]>([]);
+  const [loadedFormId, setLoadedFormId] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState(1);
+  const [parentFormId, setParentFormId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchForms() {
+      const { data } = await supabase.from('forms').select('*').eq('active', true).order('created_at', { ascending: false });
+      if (data) setExistingForms(data);
+    }
+    fetchForms();
+  }, [isSaving]);
+
+  const handleSelectForm = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = e.target.value;
+    if (!selectedId) {
+      // Reset to create new
+      setLoadedFormId(null);
+      setParentFormId(null);
+      setCurrentVersion(1);
+      setFormName('');
+      setPeriod('Monthly');
+      setReportType('VILLAGE_NUMERICAL');
+      setFields([]);
+      return;
+    }
+
+    const form = existingForms.find(f => f.id === selectedId);
+    if (!form) return;
+
+    setLoadedFormId(form.id);
+    setParentFormId(form.parent_form_id || form.id);
+    setCurrentVersion(form.version || 1);
+    setFormName(form.name);
+    setPeriod(form.reporting_period as ReportPeriod);
+    setReportType(form.report_type as ReportType);
+
+    // Fetch form sections and fields
+    const { data: sections } = await supabase.from('form_sections').select('id').eq('form_id', form.id);
+    if (sections && sections.length > 0) {
+      const sectionIds = sections.map(s => s.id);
+      const { data: dbFields } = await supabase
+        .from('form_fields')
+        .select('*, form_field_options(*)')
+        .in('section_id', sectionIds)
+        .order('display_order');
+
+      if (dbFields) {
+        setFields(dbFields.map(dbf => ({
+          id: crypto.randomUUID(), // New UUIDs so we insert fresh when saved
+          labelEn: dbf.label_en,
+          labelMr: dbf.label_mr,
+          type: dbf.field_type as FieldType,
+          required: dbf.is_required,
+          options: dbf.form_field_options?.sort((a: any, b: any) => a.display_order - b.display_order).map((opt: any) => ({
+            id: crypto.randomUUID(),
+            labelEn: opt.label_en,
+            labelMr: opt.label_mr,
+            value: opt.value
+          })) || []
+        })));
+      }
+    } else {
+      setFields([]);
+    }
+  };
 
   const addField = () => {
     setFields([...fields, { 
@@ -89,6 +157,16 @@ export default function FormBuilder() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      let finalParentId = parentFormId;
+      let nextVersion = currentVersion;
+  
+      if (loadedFormId) {
+        // Deprecate old form so it doesn't show up in lists for new submissions
+        await supabase.from('forms').update({ active: false }).eq('id', loadedFormId);
+        finalParentId = parentFormId || loadedFormId;
+        nextVersion = currentVersion + 1;
+      }
+
       // Create the form in Supabase
       const { data: form, error: formError } = await supabase
         .from('forms')
@@ -97,6 +175,8 @@ export default function FormBuilder() {
           code: formName.toLowerCase().replace(/\s+/g, '_'),
           reporting_period: period,
           report_type: reportType,
+          version: nextVersion,
+          parent_form_id: finalParentId
         })
         .select()
         .single();
@@ -159,6 +239,9 @@ export default function FormBuilder() {
       // Reset form
       setFormName('');
       setFields([]);
+      setLoadedFormId(null);
+      setParentFormId(null);
+      setCurrentVersion(1);
     } catch (error) {
       console.error('Error saving form:', error);
       alert('Failed to save form. (Note: Requires Supabase setup to be complete)');
@@ -295,7 +378,23 @@ export default function FormBuilder() {
         <>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
             <div className="space-y-6">
-              <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3">Form Details</h3>
+              <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-3 flex justify-between items-center">
+                Form Details
+                {existingForms.length > 0 && (
+                  <select
+                    value={loadedFormId || ''}
+                    onChange={handleSelectForm}
+                    className="text-xs font-normal border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1 pl-2 pr-6 ml-4"
+                  >
+                    <option value="">+ Create New Form</option>
+                    {existingForms.map(form => (
+                      <option key={form.id} value={form.id}>
+                        Edit: {form.name} (v{form.version || 1})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </h3>
               
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                 <div className="sm:col-span-4">
