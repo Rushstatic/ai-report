@@ -50,7 +50,7 @@ export default function App() {
           <Route path="reports/my" element={<MyReports />} />
           <Route path="reports/pending" element={<PendingReports />} />
           <Route path="forms/builder" element={<FormBuilder />} />
-          <Route path="reports/submit/:formId" element={<ReportSubmission />} />
+          <Route path="reports/submit/:formId/:submissionId?" element={<ReportSubmission />} />
           <Route path="employees" element={<EmployeeManager />} />
           <Route path="hierarchy" element={<HierarchyManager />} />
           {/* Add other routes here */}

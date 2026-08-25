@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FileText, Download, Filter } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Download, Filter, Edit } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
@@ -10,6 +11,7 @@ export default function MyReports() {
   const { language } = useLanguageStore();
   const t = useTranslation(language);
   const { employee } = useAuth();
+  const navigate = useNavigate();
   
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,8 @@ export default function MyReports() {
           .from('report_submissions')
           .select(`
             id,
+            form_id,
+            employee_id,
             period_start,
             period_end,
             status,
@@ -37,6 +41,8 @@ export default function MyReports() {
           query = query.eq('employees.taluka_id', employee.taluka_id);
         } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
           query = query.eq('employees.phc_id', employee.phc_id);
+        } else if (!isController && employee?.sub_centre_id) {
+          query = query.eq('employees.sub_centre_id', employee.sub_centre_id);
         } else if (!isController && employee?.id) {
           query = query.eq('employee_id', employee.id);
         }
@@ -156,7 +162,16 @@ export default function MyReports() {
                         {report.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right flex justify-end gap-2">
+                      {(!isController || report.employee_id === employee?.id) && report.status !== 'Approved' && (
+                        <button 
+                          onClick={() => navigate(`/reports/submit/${report.form_id}/${report.id}`)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-bold transition-colors"
+                        >
+                          <Edit className="w-3 h-3" />
+                          Edit
+                        </button>
+                      )}
                       <button 
                         onClick={() => handleDownloadPDF(report)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold transition-colors"

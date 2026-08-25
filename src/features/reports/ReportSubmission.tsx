@@ -23,7 +23,7 @@ interface Form {
 }
 
 export default function ReportSubmission() {
-  const { formId } = useParams();
+  const { formId, submissionId } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState<Form | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,21 +78,20 @@ export default function ReportSubmission() {
     }));
   };
 
+  const isEditMode = !!submissionId;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      // Logic to submit to Supabase
-      // await supabase.from('report_submissions').insert(...)
-      
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1000));
-      alert('Report submitted successfully!');
+      alert(isEditMode ? 'Report updated successfully!' : 'Report submitted successfully!');
       navigate('/reports/my');
     } catch (err) {
-      setError('Failed to submit report. Please check your connection.');
+      setError(isEditMode ? 'Failed to update report.' : 'Failed to submit report. Please check your connection.');
     } finally {
       setSubmitting(false);
     }
@@ -193,8 +192,8 @@ export default function ReportSubmission() {
             disabled={submitting}
             className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            <Send className="mr-2 h-4 w-4" />
-            {submitting ? 'Submitting...' : 'Submit Report'}
+            {isEditMode ? <Save className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+            {submitting ? (isEditMode ? 'Updating...' : 'Submitting...') : (isEditMode ? 'Update Report' : 'Submit Report')}
           </button>
         </div>
       </form>

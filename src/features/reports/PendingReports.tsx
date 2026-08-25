@@ -31,6 +31,10 @@ export default function PendingReports() {
           query = query.eq('employees.taluka_id', employee.taluka_id);
         } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
           query = query.eq('employees.phc_id', employee.phc_id);
+        } else if (!employee?.employee_type?.includes('CONTROLLER') && employee?.sub_centre_id) {
+          query = query.eq('employees.sub_centre_id', employee.sub_centre_id);
+        } else if (!employee?.employee_type?.includes('CONTROLLER') && employee?.id) {
+          query = query.eq('employee_id', employee.id);
         }
 
         const { data, error } = await query;
