@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useLanguageStore } from '@/store/languageStore';
+import { useAuth } from '@/hooks/useAuth';
 import { Search, Download, AlertCircle, Clock } from 'lucide-react';
 import { exportToExcel } from '@/utils/excelExport';
 
 export default function PendingReports() {
   const { language } = useLanguageStore();
+  const { employee } = useAuth();
   const [loading, setLoading] = useState(true);
   const [pendingList, setPendingList] = useState<any[]>([]);
 
@@ -15,15 +17,23 @@ export default function PendingReports() {
     async function fetchData() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('report_submissions')
           .select(`
             *,
             forms (name, reporting_period),
-            employees (name, employee_type, mobile_number, phcs(name), sub_centres(name))
+            employees!inner (name, employee_type, mobile_number, phcs(name), sub_centres(name), taluka_id)
           `)
           .in('status', ['Pending', 'Overdue'])
           .order('due_date', { ascending: true });
+
+        if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+          query = query.eq('employees.taluka_id', employee.taluka_id);
+        } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
+          query = query.eq('employees.phc_id', employee.phc_id);
+        }
+
+        const { data, error } = await query;
           
         if (data && data.length > 0) {
           setPendingList(data);

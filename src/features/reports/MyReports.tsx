@@ -35,6 +35,8 @@ export default function MyReports() {
 
         if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
           query = query.eq('employees.taluka_id', employee.taluka_id);
+        } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
+          query = query.eq('employees.phc_id', employee.phc_id);
         } else if (!isController && employee?.id) {
           query = query.eq('employee_id', employee.id);
         }

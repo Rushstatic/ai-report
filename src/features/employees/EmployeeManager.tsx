@@ -10,17 +10,25 @@ export default function EmployeeManager() {
   
   // Modals state
   const [isAdding, setIsAdding] = useState(false);
+  const isDistrictController = employee?.employee_type === 'DISTRICT_CONTROLLER';
+  const isTalukaController = employee?.employee_type === 'TALUKA_CONTROLLER';
+  const isPHCController = employee?.employee_type === 'PHC_CONTROLLER';
+
+  const defaultRole = isDistrictController ? 'TALUKA_CONTROLLER' : isTalukaController ? 'PHC_CONTROLLER' : 'MPW';
+
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     mobile_number: '',
-    employee_type: employee?.employee_type === 'DISTRICT_CONTROLLER' ? 'TALUKA_CONTROLLER' : 'PHC_CONTROLLER',
+    employee_type: defaultRole,
     designation: '',
     taluka_id: employee?.taluka_id || '',
-    phc_id: ''
+    phc_id: employee?.phc_id || '',
+    sub_centre_id: ''
   });
   
   const [talukas, setTalukas] = useState<any[]>([]);
   const [phcs, setPhcs] = useState<any[]>([]);
+  const [subcentres, setSubcentres] = useState<any[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -29,25 +37,41 @@ export default function EmployeeManager() {
   async function fetchData() {
     setLoading(true);
     try {
-      let empQuery = supabase.from('employees').select('*, talukas(name), phcs(name)').order('created_at', { ascending: false });
+      let empQuery = supabase.from('employees').select('*, talukas(name), phcs(name), sub_centres(name)').order('created_at', { ascending: false });
       let talQuery = supabase.from('talukas').select('*');
       let phcQuery = supabase.from('phcs').select('*');
+      let scQuery = supabase.from('sub_centres').select('*');
 
-      if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+      if (isTalukaController && employee.taluka_id) {
         empQuery = empQuery.eq('taluka_id', employee.taluka_id);
         talQuery = talQuery.eq('id', employee.taluka_id);
         phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
+        
+        const phcList = await supabase.from('phcs').select('id').eq('taluka_id', employee.taluka_id);
+        const phcIds = phcList.data?.map(p => p.id) || [];
+        if (phcIds.length > 0) {
+          scQuery = scQuery.in('phc_id', phcIds);
+        } else {
+          scQuery = scQuery.eq('phc_id', '00000000-0000-0000-0000-000000000000');
+        }
+      } else if (isPHCController && employee.phc_id) {
+        empQuery = empQuery.eq('phc_id', employee.phc_id);
+        talQuery = talQuery.eq('id', employee.taluka_id || '00000000-0000-0000-0000-000000000000');
+        phcQuery = phcQuery.eq('id', employee.phc_id);
+        scQuery = scQuery.eq('phc_id', employee.phc_id);
       }
 
-      const [empRes, talRes, phcRes] = await Promise.all([
+      const [empRes, talRes, phcRes, scRes] = await Promise.all([
         empQuery,
         talQuery,
-        phcQuery
+        phcQuery,
+        scQuery
       ]);
       
       if (empRes.data) setEmployees(empRes.data);
       if (talRes.data) setTalukas(talRes.data);
       if (phcRes.data) setPhcs(phcRes.data);
+      if (scRes.data) setSubcentres(scRes.data);
     } catch (error) {
       console.error("Error fetching employees", error);
     } finally {
@@ -67,12 +91,13 @@ export default function EmployeeManager() {
       
       if (newEmployee.taluka_id) payload.taluka_id = newEmployee.taluka_id;
       if (newEmployee.phc_id) payload.phc_id = newEmployee.phc_id;
+      if (newEmployee.sub_centre_id) payload.sub_centre_id = newEmployee.sub_centre_id;
       
       const { error } = await supabase.from('employees').insert(payload);
       if (error) throw error;
       
       setIsAdding(false);
-      setNewEmployee({ name: '', mobile_number: '', employee_type: employee?.employee_type === 'DISTRICT_CONTROLLER' ? 'TALUKA_CONTROLLER' : 'PHC_CONTROLLER', designation: '', taluka_id: employee?.taluka_id || '', phc_id: '' });
+      setNewEmployee({ name: '', mobile_number: '', employee_type: defaultRole, designation: '', taluka_id: employee?.taluka_id || '', phc_id: employee?.phc_id || '', sub_centre_id: '' });
       fetchData();
     } catch (error: any) {
       console.error("Error adding employee", error);
@@ -132,7 +157,7 @@ export default function EmployeeManager() {
                       {emp.mobile_number}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.phcs?.name || emp.talukas?.name || 'District Level'}
+                      {emp.sub_centres?.name || emp.phcs?.name || emp.talukas?.name || 'District Level'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {emp.status ? (
@@ -192,10 +217,12 @@ export default function EmployeeManager() {
                   onChange={(e) => setNewEmployee({...newEmployee, employee_type: e.target.value})}
                   className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 >
-                  {employee?.employee_type === 'DISTRICT_CONTROLLER' && (
+                  {isDistrictController && (
                     <option value="TALUKA_CONTROLLER">Taluka Controller</option>
                   )}
-                  <option value="PHC_CONTROLLER">PHC Controller</option>
+                  {(isDistrictController || isTalukaController) && (
+                    <option value="PHC_CONTROLLER">PHC Controller</option>
+                  )}
                   <option value="MPW">MPW</option>
                   <option value="ANM">ANM</option>
                   <option value="CHO">CHO</option>
@@ -208,7 +235,7 @@ export default function EmployeeManager() {
                   <select
                     value={newEmployee.taluka_id}
                     onChange={(e) => setNewEmployee({...newEmployee, taluka_id: e.target.value})}
-                    disabled={employee?.employee_type === 'TALUKA_CONTROLLER'}
+                    disabled={isTalukaController || isPHCController}
                     className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   >
                     <option value="">-- Select Taluka --</option>
@@ -223,10 +250,25 @@ export default function EmployeeManager() {
                   <select
                     value={newEmployee.phc_id}
                     onChange={(e) => setNewEmployee({...newEmployee, phc_id: e.target.value})}
-                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    disabled={isPHCController}
+                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   >
                     <option value="">-- Select PHC --</option>
                     {phcs.filter(p => p.taluka_id === newEmployee.taluka_id).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+              
+              {(newEmployee.employee_type === 'MPW' || newEmployee.employee_type === 'ANM' || newEmployee.employee_type === 'CHO') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Sub-centre (Optional)</label>
+                  <select
+                    value={newEmployee.sub_centre_id || ''}
+                    onChange={(e) => setNewEmployee({...newEmployee, sub_centre_id: e.target.value})}
+                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  >
+                    <option value="">-- Select Sub-centre --</option>
+                    {subcentres.filter(s => s.phc_id === newEmployee.phc_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
               )}

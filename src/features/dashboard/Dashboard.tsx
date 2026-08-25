@@ -55,6 +55,11 @@ export default function Dashboard() {
           } else {
             scQuery = scQuery.eq('phc_id', '00000000-0000-0000-0000-000000000000'); 
           }
+        } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
+          talQuery = talQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+          phcQuery = phcQuery.eq('id', employee.phc_id);
+          scQuery = scQuery.eq('phc_id', employee.phc_id);
+          empQuery = empQuery.eq('phc_id', employee.phc_id);
         }
 
         const [talukas, phcs, subcentres, employees_count] = await Promise.all([
