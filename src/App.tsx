@@ -12,6 +12,9 @@ import Dashboard from './features/dashboard/Dashboard';
 import FormBuilder from './features/forms/FormBuilder';
 import ReportSubmission from './features/reports/ReportSubmission';
 import MyReports from './features/reports/MyReports';
+import PendingReports from './features/reports/PendingReports';
+import EmployeeManager from './features/employees/EmployeeManager';
+import HierarchyManager from './features/hierarchy/HierarchyManager';
 import Login from './features/auth/Login';
 import ChangePassword from './features/auth/ChangePassword';
 import { Loader2 } from 'lucide-react';
@@ -45,8 +48,11 @@ export default function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="reports/my" element={<MyReports />} />
+          <Route path="reports/pending" element={<PendingReports />} />
           <Route path="forms/builder" element={<FormBuilder />} />
           <Route path="reports/submit/:formId" element={<ReportSubmission />} />
+          <Route path="employees" element={<EmployeeManager />} />
+          <Route path="hierarchy" element={<HierarchyManager />} />
           {/* Add other routes here */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
