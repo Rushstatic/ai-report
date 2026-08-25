@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 // Helper types matching the DB enums
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
 type ReportPeriod = 'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly';
-type ReportType = 'VILLAGE_NUMERICAL' | 'LIST' | 'SUBCENTRE_LEVEL';
+type ReportType = 'VILLAGE_NUMERICAL' | 'VILLAGE_PROGRESS' | 'LIST' | 'SUBCENTRE_LEVEL';
 
 interface FormFieldOption {
   id: string;
@@ -296,6 +296,43 @@ export default function FormBuilder() {
               <div className="text-center py-10 text-gray-500 italic">
                 No fields added to preview.
               </div>
+            ) : reportType === 'VILLAGE_PROGRESS' ? (
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Indicator</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Achievement</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
+                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {fields.map((field) => (
+                      <tr key={field.id}>
+                        <td className="px-4 py-4 text-sm font-medium text-gray-900 max-w-xs truncate">
+                          {field.labelEn || 'Untitled Field'}
+                          {field.labelMr && <div className="text-xs text-gray-500 font-normal">{field.labelMr}</div>}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-500">
+                          <input type="number" className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-24 sm:text-sm border-gray-300 rounded-md py-1.5 px-2 border" placeholder="e.g., 100" disabled />
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-500">
+                          <input type="number" className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-24 sm:text-sm border-gray-300 rounded-md py-1.5 px-2 border" placeholder="e.g., 75" disabled />
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700 bg-gray-50 font-medium">
+                          <span className="text-orange-600">Auto (25)</span>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700 bg-gray-50 font-medium">
+                          <span className="text-green-600">Auto (75%)</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               fields.map((field) => (
                 <div key={field.id} className="space-y-1">
@@ -434,6 +471,7 @@ export default function FormBuilder() {
                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border"
                   >
                     <option value="VILLAGE_NUMERICAL">Village-wise Numerical</option>
+                    <option value="VILLAGE_PROGRESS">Village-wise Progress Report (Target & Achievement)</option>
                     <option value="LIST">List Report (e.g., Patient List)</option>
                     <option value="SUBCENTRE_LEVEL">Sub-centre Level</option>
                   </select>
@@ -455,6 +493,18 @@ export default function FormBuilder() {
                   Add Field
                 </button>
               </div>
+
+              {reportType === 'VILLAGE_PROGRESS' && (
+                <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-md">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        <strong>Note for Village Progress Report:</strong> Each field you add below represents an <strong>Indicator</strong>. The system will automatically generate the <em>Target</em>, <em>Achievement</em>, <em>Pending</em>, and <em>Percentage</em> columns for data entry.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {fields.length === 0 ? (
@@ -482,7 +532,7 @@ export default function FormBuilder() {
                         </span>
                       </div>
                       <div className="flex-1 grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-12">
-                        <div className="sm:col-span-5">
+                        <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Field Label (English)</label>
                           <input
                             type="text"
@@ -492,7 +542,7 @@ export default function FormBuilder() {
                             placeholder="e.g., Fever Cases"
                           />
                         </div>
-                        <div className="sm:col-span-5">
+                        <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Field Label (Marathi)</label>
                           <input
                             type="text"
@@ -502,22 +552,24 @@ export default function FormBuilder() {
                             placeholder="उदा. तापाचे रुग्ण"
                           />
                         </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Type</label>
-                          <select
-                            value={field.type}
-                            onChange={(e) => updateField(field.id, { type: e.target.value as FieldType })}
-                            className="block w-full sm:text-sm border-gray-300 rounded-md py-1.5 pl-3 pr-8 border focus:ring-blue-500 focus:border-blue-500"
-                          >
-                            <option value="Text">Text</option>
-                            <option value="Number">Number</option>
-                            <option value="Yes/No">Yes/No</option>
-                            <option value="Date">Date</option>
-                            <option value="Dropdown">Dropdown</option>
-                          </select>
-                        </div>
+                        {reportType !== 'VILLAGE_PROGRESS' && (
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Type</label>
+                            <select
+                              value={field.type}
+                              onChange={(e) => updateField(field.id, { type: e.target.value as FieldType })}
+                              className="block w-full sm:text-sm border-gray-300 rounded-md py-1.5 pl-3 pr-8 border focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="Text">Text</option>
+                              <option value="Number">Number</option>
+                              <option value="Yes/No">Yes/No</option>
+                              <option value="Date">Date</option>
+                              <option value="Dropdown">Dropdown</option>
+                            </select>
+                          </div>
+                        )}
                         
-                        {field.type === 'Dropdown' && (
+                        {reportType !== 'VILLAGE_PROGRESS' && field.type === 'Dropdown' && (
                           <div className="sm:col-span-12 mt-2 p-4 bg-white rounded-md border border-gray-200">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="text-sm font-medium text-gray-700">Dropdown Options</h4>
