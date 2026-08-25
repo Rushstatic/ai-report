@@ -75,21 +75,27 @@ export default function HierarchyManager() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let result;
       if (activeTab === 'talukas') {
         const dId = selectedParentId || (districts[0]?.id);
-        await supabase.from('talukas').insert({ name: newName, district_id: dId });
+        result = await supabase.from('talukas').insert({ name: newName, district_id: dId });
       } else if (activeTab === 'phcs') {
         const tId = isTalukaController ? (employee?.taluka_id || talukas[0]?.id) : selectedParentId;
-        await supabase.from('phcs').insert({ name: newName, taluka_id: tId });
+        result = await supabase.from('phcs').insert({ name: newName, taluka_id: tId });
       } else if (activeTab === 'subcentres') {
-        await supabase.from('sub_centres').insert({ name: newName, phc_id: selectedParentId });
+        result = await supabase.from('sub_centres').insert({ name: newName, phc_id: selectedParentId });
       }
+
+      if (result?.error) {
+        throw result.error;
+      }
+
       setIsAdding(false);
       setNewName('');
       fetchHierarchy();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding entity", error);
-      alert("Failed to add.");
+      alert("Failed to add: " + (error.message || "Unknown error"));
     }
   };
 
