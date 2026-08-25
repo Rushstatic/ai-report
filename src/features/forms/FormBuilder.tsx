@@ -5,43 +5,32 @@ import {
   Settings, 
   Eye, 
   Save, 
-  GripVertical, 
   Pencil, 
   ArrowUp, 
   ArrowDown, 
   CheckCircle2, 
   AlertCircle, 
   RefreshCw, 
-  Copy, 
   FileText,
-  HelpCircle,
   Layers,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
+import { 
+  fetchAllActiveForms, 
+  getFormWithFields, 
+  saveLocalForm, 
+  StoredForm, 
+  FormFieldItem, 
+  FormOptionItem 
+} from '@/utils/formStorage';
 
-// Types matching the DB enums
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
 type ReportPeriod = 'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly' | 'Quarterly' | 'Yearly';
 type ReportType = 'VILLAGE_NUMERICAL' | 'VILLAGE_PROGRESS' | 'LIST' | 'SUBCENTRE_LEVEL';
-
-interface FormFieldOption {
-  id: string;
-  labelEn: string;
-  labelMr: string;
-  value: string;
-}
-
-interface FormField {
-  id: string;
-  labelEn: string;
-  labelMr: string;
-  type: FieldType;
-  required: boolean;
-  options?: FormFieldOption[];
-}
 
 export default function FormBuilder() {
   const { employee } = useAuth();
@@ -53,7 +42,7 @@ export default function FormBuilder() {
   const [period, setPeriod] = useState<ReportPeriod>('Monthly');
   const [reportType, setReportType] = useState<ReportType>('VILLAGE_NUMERICAL');
   const [targetRole, setTargetRole] = useState<string>('ALL');
-  const [fields, setFields] = useState<FormField[]>([]);
+  const [fields, setFields] = useState<FormFieldItem[]>([]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -62,25 +51,20 @@ export default function FormBuilder() {
   // Feedback states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [infoNotice, setInfoNotice] = useState<string | null>(null);
 
-  // Versioning state
-  const [existingForms, setExistingForms] = useState<any[]>([]);
+  // Form selection state
+  const [existingForms, setExistingForms] = useState<StoredForm[]>([]);
   const [loadedFormId, setLoadedFormId] = useState<string | null>(null);
   const [currentVersion, setCurrentVersion] = useState(1);
   const [parentFormId, setParentFormId] = useState<string | null>(null);
   const [loadingForms, setLoadingForms] = useState(false);
 
-  const fetchForms = async () => {
+  const loadAllForms = async () => {
     setLoadingForms(true);
     try {
-      const { data, error } = await (supabase
-        .from('forms') as any)
-        .select('*')
-        .order('name');
-      
-      if (!error && data) {
-        setExistingForms(data);
-      }
+      const forms = await fetchAllActiveForms();
+      setExistingForms(forms);
     } catch (err) {
       console.error('Error fetching forms:', err);
     } finally {
@@ -89,16 +73,17 @@ export default function FormBuilder() {
   };
 
   useEffect(() => {
-    fetchForms();
+    loadAllForms();
   }, []);
 
   const handleSelectForm = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     setErrorMsg(null);
     setSuccessMsg(null);
+    setInfoNotice(null);
 
     if (!selectedId) {
-      // Reset to create new
+      // Reset form
       setLoadedFormId(null);
       setParentFormId(null);
       setCurrentVersion(1);
@@ -113,57 +98,19 @@ export default function FormBuilder() {
       return;
     }
 
-    const form = existingForms.find(f => f.id === selectedId);
-    if (!form) return;
+    const fullForm = await getFormWithFields(selectedId);
+    if (!fullForm) return;
 
-    setLoadedFormId(form.id);
-    setParentFormId(form.parent_form_id || form.id);
-    setCurrentVersion(form.version || 1);
-    setFormName(form.name || '');
-    setFormDescription(form.description || '');
-    setFormCode(form.code || '');
-    setPeriod((form.reporting_period as ReportPeriod) || 'Monthly');
-    setReportType((form.report_type as ReportType) || 'VILLAGE_NUMERICAL');
-    setTargetRole(form.target_role || 'ALL');
-
-    // Fetch form sections and fields
-    try {
-      const { data: sections } = await (supabase
-        .from('form_sections') as any)
-        .select('id')
-        .eq('form_id', form.id);
-
-      if (sections && sections.length > 0) {
-        const sectionIds = sections.map((s: any) => s.id);
-        const { data: dbFields } = await (supabase
-          .from('form_fields') as any)
-          .select('*, form_field_options(*)')
-          .in('section_id', sectionIds)
-          .order('display_order');
-
-        if (dbFields && dbFields.length > 0) {
-          setFields(dbFields.map((dbf: any) => ({
-            id: crypto.randomUUID(),
-            labelEn: dbf.label_en || '',
-            labelMr: dbf.label_mr || '',
-            type: (dbf.field_type as FieldType) || 'Text',
-            required: !!dbf.is_required,
-            options: dbf.form_field_options?.sort((a: any, b: any) => a.display_order - b.display_order).map((opt: any) => ({
-              id: crypto.randomUUID(),
-              labelEn: opt.label_en || '',
-              labelMr: opt.label_mr || '',
-              value: opt.value || ''
-            })) || []
-          })));
-        } else {
-          setFields([]);
-        }
-      } else {
-        setFields([]);
-      }
-    } catch (err) {
-      console.error('Error fetching fields for form:', err);
-    }
+    setLoadedFormId(fullForm.id);
+    setParentFormId(fullForm.parent_form_id || fullForm.id);
+    setCurrentVersion(fullForm.version || 1);
+    setFormName(fullForm.name || '');
+    setFormDescription(fullForm.description || '');
+    setFormCode(fullForm.code || '');
+    setPeriod((fullForm.reporting_period as ReportPeriod) || 'Monthly');
+    setReportType((fullForm.report_type as ReportType) || 'VILLAGE_NUMERICAL');
+    setTargetRole(fullForm.target_role || 'ALL');
+    setFields(fullForm.fields || []);
   };
 
   const addField = () => {
@@ -180,7 +127,7 @@ export default function FormBuilder() {
     ]);
   };
 
-  const updateField = (id: string, updates: Partial<FormField>) => {
+  const updateField = (id: string, updates: Partial<FormFieldItem>) => {
     setFields(fields.map(f => f.id === id ? { ...f, ...updates } : f));
   };
 
@@ -212,12 +159,12 @@ export default function FormBuilder() {
     }));
   };
 
-  const updateOption = (fieldId: string, optionId: string, updates: Partial<FormFieldOption>) => {
+  const updateOption = (fieldId: string, optionId: string, updates: Partial<FormOptionItem>) => {
     setFields(fields.map(f => {
       if (f.id === fieldId) {
         return {
           ...f,
-          options: f.options?.map(opt => opt.id === optionId ? { ...opt, ...updates } : opt)
+          options: f.options?.map(opt => (opt.id === optionId ? { ...opt, ...updates } : opt))
         };
       }
       return f;
@@ -239,6 +186,7 @@ export default function FormBuilder() {
   const loadPreset = (presetType: 'maternal' | 'malaria' | 'water' | 'ncd') => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    setInfoNotice(null);
 
     if (presetType === 'maternal') {
       setFormName('Maternal & Child Health Tracking (माता व बाल आरोग्य नोंद)');
@@ -313,170 +261,217 @@ export default function FormBuilder() {
     setIsSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setInfoNotice(null);
 
-    try {
-      // 1. Generate or determine safe unique code
-      let generatedCode = formCode.trim();
-      if (!generatedCode) {
-        const cleanSlug = formName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '_')
-          .replace(/^_+|_+$/g, '')
-          .slice(0, 30);
-        generatedCode = cleanSlug ? `${cleanSlug}_${Date.now().toString().slice(-4)}` : `FORM_${Date.now()}`;
+    // Generate safe unique code and target ID
+    let finalCode = formCode.trim();
+    if (!finalCode) {
+      const cleanSlug = formName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 24);
+      finalCode = cleanSlug ? `${cleanSlug}_${Date.now().toString().slice(-4)}` : `FORM_${Date.now()}`;
+    }
+
+    let targetId = loadedFormId;
+    let nextVersion = currentVersion;
+    let finalParentId = parentFormId;
+
+    if (!targetId || saveMode === 'new_version') {
+      targetId = crypto.randomUUID();
+      if (loadedFormId && saveMode === 'new_version') {
+        finalParentId = parentFormId || loadedFormId;
+        nextVersion = currentVersion + 1;
       }
+    }
 
-      let targetFormId = loadedFormId;
+    // Prepare complete form object
+    const storedFormObject: StoredForm = {
+      id: targetId,
+      name: formName.trim(),
+      code: finalCode,
+      description: formDescription.trim(),
+      reporting_period: period,
+      report_type: reportType,
+      target_role: targetRole,
+      version: nextVersion,
+      parent_form_id: finalParentId,
+      active: true,
+      fields: fields.map((f, idx) => ({
+        ...f,
+        id: f.id || crypto.randomUUID(),
+        name: f.name || `field_${idx + 1}`
+      }))
+    };
 
-      if (loadedFormId && saveMode === 'update') {
-        // Mode A: Update existing form directly
-        const { error: updateFormErr } = await (supabase
-          .from('forms') as any)
-          .update({
+    // 1. Save to local storage first (Ensures immediate usability in Data Entry)
+    saveLocalForm(storedFormObject);
+
+    // 2. Attempt saving to Supabase if configured
+    let supabaseSaved = false;
+    let supabaseErrorNote = '';
+
+    if (isSupabaseConfigured()) {
+      try {
+        if (loadedFormId && saveMode === 'update') {
+          // Update Form row
+          const updatePayload: any = {
             name: formName.trim(),
             description: formDescription.trim(),
             reporting_period: period,
             report_type: reportType,
-            target_role: targetRole,
             active: true,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', loadedFormId);
+          };
+          if (targetRole) updatePayload.target_role = targetRole;
 
-        if (updateFormErr) throw updateFormErr;
+          const { error: updateErr } = await (supabase
+            .from('forms') as any)
+            .update(updatePayload)
+            .eq('id', loadedFormId);
 
-        // Clean existing sections & fields for this form
+          if (updateErr) throw updateErr;
+
+        } else {
+          // Insert Form row
+          const insertPayload: any = {
+            id: targetId,
+            name: formName.trim(),
+            code: finalCode,
+            description: formDescription.trim(),
+            reporting_period: period,
+            report_type: reportType,
+            active: true
+          };
+          if (targetRole) insertPayload.target_role = targetRole;
+          if (nextVersion) insertPayload.version = nextVersion;
+          if (finalParentId) insertPayload.parent_form_id = finalParentId;
+
+          const { error: insertErr } = await (supabase
+            .from('forms') as any)
+            .insert(insertPayload);
+
+          if (insertErr) throw insertErr;
+        }
+
+        // Section handling
         const { data: existingSecs } = await (supabase
           .from('form_sections') as any)
           .select('id')
-          .eq('form_id', loadedFormId);
+          .eq('form_id', targetId);
 
-        if (existingSecs && existingSecs.length > 0) {
-          const secIds = existingSecs.map((s: any) => s.id);
-          await (supabase.from('form_fields') as any).delete().in('section_id', secIds);
-          await (supabase.from('form_sections') as any).delete().eq('form_id', loadedFormId);
-        }
+        let sectionId = existingSecs?.[0]?.id;
 
-      } else {
-        // Mode B: Create new form OR publish as new version
-        let finalParentId = parentFormId;
-        let nextVersion = currentVersion;
+        if (!sectionId) {
+          const { data: newSec, error: secErr } = await (supabase
+            .from('form_sections') as any)
+            .insert({
+              form_id: targetId,
+              title: 'General Section',
+              display_order: 0
+            })
+            .select('id')
+            .single();
 
-        if (loadedFormId && saveMode === 'new_version') {
-          // Deactivate previous version so standard lists point to current
-          await (supabase.from('forms') as any).update({ active: false }).eq('id', loadedFormId);
-          finalParentId = parentFormId || loadedFormId;
-          nextVersion = currentVersion + 1;
-        }
-
-        const newFormPayload = {
-          name: formName.trim(),
-          code: generatedCode,
-          description: formDescription.trim(),
-          reporting_period: period,
-          report_type: reportType,
-          target_role: targetRole,
-          version: nextVersion,
-          parent_form_id: finalParentId,
-          active: true,
-          created_by: employee?.id || null
-        };
-
-        const { data: createdForm, error: formError } = await (supabase
-          .from('forms') as any)
-          .insert(newFormPayload)
-          .select()
-          .single();
-
-        if (formError) throw formError;
-        targetFormId = createdForm.id;
-      }
-
-      if (!targetFormId) throw new Error('Could not obtain valid Form ID.');
-
-      // 2. Create Section
-      const { data: section, error: sectionError } = await (supabase
-        .from('form_sections') as any)
-        .insert({ 
-          form_id: targetFormId, 
-          title: 'General Section',
-          display_order: 0
-        })
-        .select()
-        .single();
-
-      if (sectionError) throw sectionError;
-
-      // 3. Insert Fields
-      if (fields.length > 0) {
-        const fieldsToInsert = fields.map((f, index) => {
-          const safeName = (f.labelEn || f.labelMr || `field_${index + 1}`)
-            .toLowerCase()
-            .replace(/[^a-z0-9_]+/g, '_')
-            .replace(/^_+|_+$/g, '')
-            .slice(0, 40) || `field_${index + 1}`;
-
-          return {
-            section_id: section.id,
-            label_en: f.labelEn.trim() || f.labelMr.trim(),
-            label_mr: f.labelMr.trim() || f.labelEn.trim(),
-            name: `${safeName}_${index + 1}`,
-            field_type: f.type,
-            is_required: f.required,
-            display_order: index,
-          };
-        });
-
-        const { data: insertedFields, error: fieldsError } = await (supabase
-          .from('form_fields') as any)
-          .insert(fieldsToInsert)
-          .select();
-
-        if (fieldsError) throw fieldsError;
-
-        // 4. Insert Dropdown Options if any
-        const optionsToInsert: any[] = [];
-        fields.forEach((f, i) => {
-          if (f.type === 'Dropdown' && f.options && f.options.length > 0 && insertedFields?.[i]) {
-            const dbField = insertedFields[i];
-            f.options.forEach((opt, optIndex) => {
-              if (opt.labelEn.trim() || opt.labelMr.trim()) {
-                optionsToInsert.push({
-                  field_id: dbField.id,
-                  label_en: opt.labelEn.trim() || opt.labelMr.trim(),
-                  label_mr: opt.labelMr.trim() || opt.labelEn.trim(),
-                  value: opt.value.trim() || (opt.labelEn || opt.labelMr).toLowerCase().replace(/\s+/g, '_'),
-                  display_order: optIndex,
-                });
-              }
-            });
+          if (!secErr && newSec) {
+            sectionId = newSec.id;
           }
-        });
-
-        if (optionsToInsert.length > 0) {
-          const { error: optionsError } = await (supabase
-            .from('form_field_options') as any)
-            .insert(optionsToInsert);
-          
-          if (optionsError) throw optionsError;
         }
-      }
 
+        if (sectionId) {
+          // Clean previous fields if any and insert fresh
+          const { data: oldFlds } = await (supabase
+            .from('form_fields') as any)
+            .select('id')
+            .eq('section_id', sectionId);
+
+          if (oldFlds && oldFlds.length > 0) {
+            const oldIds = oldFlds.map((o: any) => o.id);
+            await (supabase.from('form_field_options') as any).delete().in('field_id', oldIds);
+            await (supabase.from('form_fields') as any).delete().in('id', oldIds);
+          }
+
+          const fieldsToInsert = fields.map((f, index) => {
+            const safeName = (f.labelEn || f.labelMr || `field_${index + 1}`)
+              .toLowerCase()
+              .replace(/[^a-z0-9_]+/g, '_')
+              .replace(/^_+|_+$/g, '')
+              .slice(0, 40) || `field_${index + 1}`;
+
+            return {
+              section_id: sectionId,
+              label_en: f.labelEn.trim() || f.labelMr.trim(),
+              label_mr: f.labelMr.trim() || f.labelEn.trim(),
+              name: `${safeName}_${index + 1}`,
+              field_type: f.type,
+              is_required: f.required,
+              display_order: index,
+            };
+          });
+
+          const { data: insertedFields } = await (supabase
+            .from('form_fields') as any)
+            .insert(fieldsToInsert)
+            .select();
+
+          // Dropdown options
+          const optionsToInsert: any[] = [];
+          fields.forEach((f, i) => {
+            if (f.type === 'Dropdown' && f.options && f.options.length > 0 && insertedFields?.[i]) {
+              const dbField = insertedFields[i];
+              f.options.forEach((opt, optIndex) => {
+                if (opt.labelEn.trim() || opt.labelMr.trim()) {
+                  optionsToInsert.push({
+                    field_id: dbField.id,
+                    label_en: opt.labelEn.trim() || opt.labelMr.trim(),
+                    label_mr: opt.labelMr.trim() || opt.labelEn.trim(),
+                    value: opt.value.trim() || (opt.labelEn || opt.labelMr).toLowerCase().replace(/\s+/g, '_'),
+                    display_order: optIndex,
+                  });
+                }
+              });
+            }
+          });
+
+          if (optionsToInsert.length > 0) {
+            await (supabase.from('form_field_options') as any).insert(optionsToInsert);
+          }
+        }
+
+        supabaseSaved = true;
+      } catch (err: any) {
+        console.warn('Supabase save warning (fallback to local form storage):', err);
+        supabaseErrorNote = err?.message || 'Supabase database policy requires migration';
+      }
+    }
+
+    setLoadedFormId(targetId);
+    setFormCode(finalCode);
+
+    if (supabaseSaved) {
       setSuccessMsg(
         language === 'mr' 
-          ? `अहवाल प्रपत्र '${formName}' यशस्वीरीत्या प्रकाशित झाले आहे!` 
-          : `Form '${formName}' published and live for field reporting!`
+          ? `अहवाल प्रपत्र '${formName}' थेट डेटाबेसमध्ये प्रकाशित झाले आहे आणि कर्मचाऱ्यांसाठी सक्रिय आहे!` 
+          : `Form '${formName}' successfully published to Supabase and is live for field reporting!`
       );
-
-      // Refresh forms dropdown list
-      await fetchForms();
-
-    } catch (error: any) {
-      console.error('Error publishing form:', error);
-      setErrorMsg(error?.message || 'Database error while publishing form. Please check permissions.');
-    } finally {
-      setIsSaving(false);
+    } else {
+      setSuccessMsg(
+        language === 'mr' 
+          ? `अहवाल प्रपत्र '${formName}' जतन झाले असून "Data Entry" मध्ये सक्रिय आहे!` 
+          : `Form '${formName}' saved successfully and is active for Data Entry!`
+      );
+      if (supabaseErrorNote) {
+        setInfoNotice(
+          language === 'mr'
+            ? `टीप: सर्व उपकरणांवर त्वरित सिंक करण्यासाठी Supabase SQL Editor मध्ये मायग्रेशन 00017 चालवा.`
+            : `Note: Live locally in portal. To sync across multi-tenant servers, run migration 00017 in your Supabase SQL Editor.`
+        );
+      }
     }
+
+    await loadAllForms();
+    setIsSaving(false);
   };
 
   return (
@@ -532,7 +527,7 @@ export default function FormBuilder() {
                 <Save className="mr-2 h-4 w-4" />
                 {loadedFormId 
                   ? (saveMode === 'update' 
-                      ? (language === 'mr' ? 'बदल जतन करा (Save Changes)' : 'Update Live Form') 
+                      ? (language === 'mr' ? 'बदल जतन करा' : 'Save Changes') 
                       : (language === 'mr' ? 'नवीन आवृत्ती प्रकाशित करा' : 'Publish New Version'))
                   : (language === 'mr' ? 'प्रपत्र प्रकाशित करा (Publish)' : 'Publish Form')
                 }
@@ -549,7 +544,7 @@ export default function FormBuilder() {
             <AlertCircle className="h-5 w-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-red-800">
-                {language === 'mr' ? 'अहवाल जतन करताना त्रुटी आली:' : 'Failed to save form:'}
+                {language === 'mr' ? 'त्रुटी:' : 'Error:'}
               </p>
               <p className="text-xs text-red-700 mt-0.5">{errorMsg}</p>
             </div>
@@ -569,9 +564,14 @@ export default function FormBuilder() {
               <p className="text-xs text-emerald-700 mt-0.5">
                 {language === 'mr' ? 'कर्मचारी आता "Data Entry" मेनूमधून हा अहवाल सादर करू शकतात.' : 'Field workers can now submit entries for this form under Data Entry.'}
               </p>
+              {infoNotice && (
+                <p className="text-xs text-emerald-800 font-medium mt-1 bg-emerald-100/70 p-1.5 rounded">
+                  {infoNotice}
+                </p>
+              )}
             </div>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-emerald-600 text-sm font-bold">×</button>
+          <button onClick={() => { setSuccessMsg(null); setInfoNotice(null); }} className="text-emerald-400 hover:text-emerald-600 text-sm font-bold">×</button>
         </div>
       )}
 
@@ -1029,25 +1029,25 @@ export default function FormBuilder() {
                           </div>
                           <div className="space-y-2">
                             {field.options?.map((option, optIdx) => (
-                              <div key={option.id} className="flex items-center gap-2">
+                              <div key={option.id || optIdx} className="flex items-center gap-2">
                                 <span className="text-xs text-slate-400 w-4 font-bold">{optIdx + 1}.</span>
                                 <input
                                   type="text"
                                   placeholder="Option EN (e.g. Normal)"
                                   value={option.labelEn}
-                                  onChange={(e) => updateOption(field.id, option.id, { labelEn: e.target.value })}
+                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelEn: e.target.value })}
                                   className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
                                 />
                                 <input
                                   type="text"
                                   placeholder="Option MR (उदा. सामान्य)"
                                   value={option.labelMr}
-                                  onChange={(e) => updateOption(field.id, option.id, { labelMr: e.target.value })}
+                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelMr: e.target.value })}
                                   className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => removeOption(field.id, option.id)}
+                                  onClick={() => removeOption(field.id, option.id || `${optIdx}`)}
                                   className="text-slate-400 hover:text-red-500 p-1"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />

@@ -1,0 +1,275 @@
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { STANDARD_FORMS, StandardFormDefinition } from './syncForms';
+
+export interface FormOptionItem {
+  id?: string;
+  labelEn: string;
+  labelMr: string;
+  value: string;
+}
+
+export interface FormFieldItem {
+  id: string;
+  name?: string;
+  labelEn: string;
+  labelMr: string;
+  type: 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
+  required: boolean;
+  options?: FormOptionItem[];
+}
+
+export interface StoredForm {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  reporting_period: string;
+  report_type: string;
+  target_role: string;
+  version: number;
+  parent_form_id?: string | null;
+  active: boolean;
+  fields: FormFieldItem[];
+  created_at?: string;
+  updated_at?: string;
+  is_local?: boolean;
+}
+
+const LOCAL_FORMS_KEY = 'health_portal_custom_forms_v1';
+
+export function getLocalForms(): StoredForm[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_FORMS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Error reading local forms:', err);
+    return [];
+  }
+}
+
+export function saveLocalForm(form: StoredForm): void {
+  try {
+    const existing = getLocalForms();
+    const idx = existing.findIndex(f => f.id === form.id || f.code === form.code);
+    if (idx >= 0) {
+      existing[idx] = { ...existing[idx], ...form, updated_at: new Date().toISOString() };
+    } else {
+      existing.unshift({ ...form, is_local: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    }
+    localStorage.setItem(LOCAL_FORMS_KEY, JSON.stringify(existing));
+  } catch (err) {
+    console.error('Error saving local form:', err);
+  }
+}
+
+export function deleteLocalForm(formId: string): void {
+  try {
+    const existing = getLocalForms();
+    const filtered = existing.filter(f => f.id !== formId && f.code !== formId);
+    localStorage.setItem(LOCAL_FORMS_KEY, JSON.stringify(filtered));
+  } catch (err) {
+    console.error('Error deleting local form:', err);
+  }
+}
+
+/**
+ * Loads all active forms by combining database forms, local storage forms, and standard definitions
+ */
+export async function fetchAllActiveForms(targetRole?: string): Promise<StoredForm[]> {
+  const combinedMap = new Map<string, StoredForm>();
+
+  // 1. Add standard forms as baseline
+  for (const sf of STANDARD_FORMS) {
+    const fields: FormFieldItem[] = [];
+    sf.sections.forEach(sec => {
+      sec.fields.forEach((f, fIdx) => {
+        fields.push({
+          id: `${sf.id}_f_${fIdx}`,
+          name: f.name,
+          labelEn: f.label_en,
+          labelMr: f.label_mr,
+          type: f.field_type,
+          required: f.is_required,
+          options: f.options?.map(o => ({ labelEn: o.label_en, labelMr: o.label_mr, value: o.value })) || []
+        });
+      });
+    });
+
+    combinedMap.set(sf.id, {
+      id: sf.id,
+      name: sf.name,
+      code: sf.code,
+      description: sf.description,
+      reporting_period: sf.reporting_period,
+      report_type: sf.report_type,
+      target_role: sf.target_role,
+      version: 1,
+      active: true,
+      fields
+    });
+  }
+
+  // 2. Fetch from Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: dbForms, error } = await (supabase
+        .from('forms') as any)
+        .select('*')
+        .or('active.is.null,active.eq.true')
+        .order('name');
+
+      if (!error && dbForms && dbForms.length > 0) {
+        for (const dbf of dbForms) {
+          combinedMap.set(dbf.id, {
+            id: dbf.id,
+            name: dbf.name,
+            code: dbf.code || dbf.id,
+            description: dbf.description || '',
+            reporting_period: dbf.reporting_period || 'Monthly',
+            report_type: dbf.report_type || 'VILLAGE_NUMERICAL',
+            target_role: dbf.target_role || 'ALL',
+            version: dbf.version || 1,
+            parent_form_id: dbf.parent_form_id,
+            active: dbf.active !== false,
+            fields: [] // fields will be loaded on demand or cached
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch forms from Supabase:', e);
+    }
+  }
+
+  // 3. Merge locally created/published forms (overrides baseline if newer)
+  const localForms = getLocalForms();
+  for (const lf of localForms) {
+    if (lf.active !== false) {
+      combinedMap.set(lf.id, lf);
+    }
+  }
+
+  // Filter by role if specified
+  const allForms = Array.from(combinedMap.values());
+  if (!targetRole || targetRole === 'ALL') {
+    return allForms;
+  }
+
+  const roleUpper = targetRole.toUpperCase();
+  return allForms.filter(f => {
+    if (!f.target_role || f.target_role === 'ALL' || f.target_role === 'All' || f.target_role === '') return true;
+    const roles = f.target_role.toUpperCase().split(/[,/| ]+/).map(r => r.trim());
+    return roles.includes('ALL') || roles.includes(roleUpper);
+  });
+}
+
+/**
+ * Fetch a single form along with all its fields and options
+ */
+export async function getFormWithFields(formIdOrCode: string): Promise<StoredForm | null> {
+  // Check local forms first
+  const localForms = getLocalForms();
+  const localMatch = localForms.find(f => f.id === formIdOrCode || f.code === formIdOrCode);
+  if (localMatch && localMatch.fields && localMatch.fields.length > 0) {
+    return localMatch;
+  }
+
+  // Check Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: dbForm } = await (supabase
+        .from('forms') as any)
+        .select('*')
+        .or(`id.eq.${formIdOrCode},code.eq.${formIdOrCode}`)
+        .maybeSingle();
+
+      if (dbForm) {
+        const { data: sections } = await (supabase
+          .from('form_sections') as any)
+          .select('id, title, display_order')
+          .eq('form_id', dbForm.id)
+          .order('display_order');
+
+        let loadedFields: FormFieldItem[] = [];
+        if (sections && sections.length > 0) {
+          const secIds = sections.map((s: any) => s.id);
+          const { data: dbFields } = await (supabase
+            .from('form_fields') as any)
+            .select('*, form_field_options(*)')
+            .in('section_id', secIds)
+            .order('display_order');
+
+          if (dbFields && dbFields.length > 0) {
+            loadedFields = dbFields.map((f: any) => ({
+              id: f.id,
+              name: f.name,
+              labelEn: f.label_en || f.name,
+              labelMr: f.label_mr || f.name,
+              type: f.field_type,
+              required: !!f.is_required,
+              options: f.form_field_options?.map((o: any) => ({
+                id: o.id,
+                labelEn: o.label_en,
+                labelMr: o.label_mr,
+                value: o.value
+              })) || []
+            }));
+          }
+        }
+
+        if (loadedFields.length > 0) {
+          return {
+            id: dbForm.id,
+            name: dbForm.name,
+            code: dbForm.code || dbForm.id,
+            description: dbForm.description || '',
+            reporting_period: dbForm.reporting_period || 'Monthly',
+            report_type: dbForm.report_type || 'VILLAGE_NUMERICAL',
+            target_role: dbForm.target_role || 'ALL',
+            version: dbForm.version || 1,
+            parent_form_id: dbForm.parent_form_id,
+            active: dbForm.active !== false,
+            fields: loadedFields
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Error fetching form details from Supabase:', err);
+    }
+  }
+
+  // Fallback to standard definitions
+  const stdMatch = STANDARD_FORMS.find(f => f.id === formIdOrCode || f.code === formIdOrCode);
+  if (stdMatch) {
+    const fields: FormFieldItem[] = [];
+    stdMatch.sections.forEach(sec => {
+      sec.fields.forEach((f, fIdx) => {
+        fields.push({
+          id: `${stdMatch.id}_f_${fIdx}`,
+          name: f.name,
+          labelEn: f.label_en,
+          labelMr: f.label_mr,
+          type: f.field_type,
+          required: f.is_required,
+          options: f.options?.map(o => ({ labelEn: o.label_en, labelMr: o.label_mr, value: o.value })) || []
+        });
+      });
+    });
+
+    return {
+      id: stdMatch.id,
+      name: stdMatch.name,
+      code: stdMatch.code,
+      description: stdMatch.description,
+      reporting_period: stdMatch.reporting_period,
+      report_type: stdMatch.report_type,
+      target_role: stdMatch.target_role,
+      version: 1,
+      active: true,
+      fields
+    };
+  }
+
+  return localMatch || null;
+}

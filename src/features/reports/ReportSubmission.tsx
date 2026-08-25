@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
+import { getFormWithFields } from '@/utils/formStorage';
 
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
 
@@ -104,72 +105,47 @@ export default function ReportSubmission() {
           return;
         }
 
-        // 1. Fetch form definition and its fields from Supabase
-        const fetchFormDetails = async (targetId: string) => {
-          const { data: dbForm } = await (supabase
-            .from('forms') as any)
-            .select('*')
-            .or(`id.eq.${targetId},code.eq.${targetId}`)
-            .maybeSingle();
+        // 1. Fetch form definition and its fields
+        let formObj: any = await getFormWithFields(activeFormId);
 
-          if (!dbForm) return null;
-
-          // Fetch Sections & Fields for this form
-          const { data: sections } = await (supabase
-            .from('form_sections') as any)
-            .select('id, title, display_order')
-            .eq('form_id', dbForm.id)
-            .order('display_order');
-
-          let fieldsList: FormField[] = [];
-          if (sections && sections.length > 0) {
-            const secIds = sections.map((s: any) => s.id);
-            const { data: dbFields } = await (supabase
-              .from('form_fields') as any)
-              .select('*, form_field_options(*)')
-              .in('section_id', secIds)
-              .order('display_order');
-
-            if (dbFields) {
-              fieldsList = dbFields.map((f: any) => ({
-                id: f.id,
-                name: f.name,
-                label_en: f.label_en || f.name,
-                label_mr: f.label_mr || f.name,
-                field_type: (f.field_type as FieldType) || 'Text',
-                is_required: !!f.is_required,
-                options: f.form_field_options || []
-              }));
-            }
-          }
-
-          return {
-            id: dbForm.id,
-            name: dbForm.name,
-            code: dbForm.code,
-            description: dbForm.description || '',
-            reporting_period: dbForm.reporting_period || 'Monthly',
-            report_type: dbForm.report_type,
-            target_role: dbForm.target_role,
-            fields: fieldsList
-          };
-        };
-
-        let formObj = await fetchFormDetails(activeFormId);
-
-        // If form or its fields are not present in database yet, auto-sync standard templates to live DB
-        if (!formObj || formObj.fields.length === 0) {
+        // If form or its fields are not present, try standard sync
+        if (!formObj || !formObj.fields || formObj.fields.length === 0) {
           await syncStandardFormsToDatabase();
-          formObj = await fetchFormDetails(activeFormId);
+          formObj = await getFormWithFields(activeFormId);
         }
 
         if (!formObj) {
-          setError('The requested form was not found in the database.');
+          setError('The requested form was not found.');
           setLoading(false);
           return;
         }
 
-        setForm(formObj);
+        // Map FormFieldItem to FormField
+        const mappedFields: FormField[] = (formObj.fields || []).map((f: any) => ({
+          id: f.id,
+          name: f.name || f.id,
+          label_en: f.labelEn || f.label_en || f.name,
+          label_mr: f.labelMr || f.label_mr || f.name,
+          field_type: (f.type || f.field_type || 'Text') as FieldType,
+          is_required: f.required !== undefined ? !!f.required : !!f.is_required,
+          options: (f.options || []).map((o: any) => ({
+            id: o.id || o.value,
+            label_en: o.labelEn || o.label_en || o.value,
+            label_mr: o.labelMr || o.label_mr || o.value,
+            value: o.value
+          }))
+        }));
+
+        setForm({
+          id: formObj.id,
+          name: formObj.name,
+          code: formObj.code,
+          description: formObj.description || '',
+          reporting_period: formObj.reporting_period || 'Monthly',
+          report_type: formObj.report_type,
+          target_role: formObj.target_role,
+          fields: mappedFields
+        });
 
         // 2. Fetch live Villages for Employee's Sub-centre
         if (employee?.sub_centre_id) {

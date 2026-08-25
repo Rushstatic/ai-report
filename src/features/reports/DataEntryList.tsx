@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
+import { fetchAllActiveForms } from '@/utils/formStorage';
 
 interface FormItem {
   id: string;
@@ -49,26 +50,8 @@ export default function DataEntryList() {
   const loadFormsAndSubmissions = async () => {
     setLoading(true);
     try {
-      // 1. Fetch live active forms from Supabase
-      const { data: formsData } = await (supabase
-        .from('forms') as any)
-        .select('*')
-        .or('active.is.null,active.eq.true')
-        .order('name');
-
-      let loadedForms: FormItem[] = [];
-
-      if (formsData && formsData.length > 0) {
-        // Filter by role match or 'ALL'
-        loadedForms = formsData.filter((f: any) => {
-          if (!f.target_role || f.target_role === 'ALL' || f.target_role === '' || f.target_role === 'All') {
-            return true;
-          }
-          const roles = f.target_role.toUpperCase().split(/[,/| ]+/).map((r: string) => r.trim());
-          return roles.includes('ALL') || roles.includes(empRole);
-        });
-      }
-
+      // 1. Fetch active forms (Database + Standard + Custom forms)
+      const loadedForms = await fetchAllActiveForms(empRole);
       setForms(loadedForms);
 
       // 2. Fetch recent submissions for this sub-centre to indicate status
