@@ -29,6 +29,7 @@ interface FormItem {
   reporting_period: string;
   report_type: string;
   target_role?: string;
+  employee_wise_submission?: boolean;
 }
 
 export default function DataEntryList() {
@@ -96,10 +97,24 @@ export default function DataEntryList() {
     return matchesSearch && matchesPeriod;
   });
 
-  const getFormStatus = (formId: string) => {
-    const matched = submissions.find(s => s.form_id === formId);
-    if (!matched) return null;
-    return matched;
+  const getFormStatus = (form: FormItem) => {
+    if (form.employee_wise_submission) {
+      // 1. Employee-wise = Yes: Needs submission by THIS specific employee
+      const mySub = submissions.find(s => s.form_id === form.id && s.employee_id === employee?.id);
+      return {
+        isEmployeeWise: true,
+        submitted: !!mySub,
+        record: mySub
+      };
+    } else {
+      // 2. Employee-wise = No: Completed if ANY authorized employee from sub-centre submitted
+      const subCentreSub = submissions.find(s => s.form_id === form.id);
+      return {
+        isEmployeeWise: false,
+        submitted: !!subCentreSub,
+        record: subCentreSub
+      };
+    }
   };
 
   return (
@@ -213,7 +228,8 @@ export default function DataEntryList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredForms.map((form) => {
-            const lastSub = getFormStatus(form.id);
+            const statusInfo = getFormStatus(form);
+            const subRec = statusInfo.record;
 
             return (
               <div
@@ -235,6 +251,15 @@ export default function DataEntryList() {
                           Role: {form.target_role}
                         </span>
                       )}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        form.employee_wise_submission
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}>
+                        {form.employee_wise_submission 
+                          ? (language === 'mr' ? '👤 Employee-wise (स्वतंत्र)' : '👤 Individual') 
+                          : (language === 'mr' ? '🏢 Sub-centre Level (एकत्रित)' : '🏢 Sub-centre Level')}
+                      </span>
                     </div>
                   </div>
 
@@ -251,21 +276,23 @@ export default function DataEntryList() {
 
                 <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
                   <div>
-                    {lastSub ? (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        lastSub.status === 'Approved'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : lastSub.status === 'Submitted'
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'bg-amber-50 text-amber-700'
+                    {statusInfo.submitted && subRec ? (
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold ${
+                        subRec.status === 'Approved'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : subRec.status === 'Submitted'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
-                        {lastSub.status === 'Approved' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                        {lastSub.status} ({new Date(lastSub.submitted_at).toLocaleDateString()})
+                        {subRec.status === 'Approved' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                        {subRec.status} {form.employee_wise_submission ? '(Your Report)' : '(Sub-centre Submitted)'}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {language === 'mr' ? 'चालू महिना भरणे बाकी' : 'Due for current period'}
+                      <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {form.employee_wise_submission
+                          ? (language === 'mr' ? 'आपला वैयक्तिक अहवाल बाकी' : 'Your submission is due')
+                          : (language === 'mr' ? 'उपकेंद्र अहवाल भरणे बाकी' : 'Sub-centre report due')}
                       </span>
                     )}
                   </div>

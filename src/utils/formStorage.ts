@@ -26,6 +26,7 @@ export interface StoredForm {
   reporting_period: string;
   report_type: string;
   target_role: string;
+  employee_wise_submission?: boolean;
   version: number;
   parent_form_id?: string | null;
   active: boolean;
@@ -105,6 +106,7 @@ export async function fetchAllActiveForms(targetRole?: string): Promise<StoredFo
       reporting_period: sf.reporting_period,
       report_type: sf.report_type,
       target_role: sf.target_role,
+      employee_wise_submission: sf.employee_wise_submission ?? false,
       version: 1,
       active: true,
       fields
@@ -130,6 +132,7 @@ export async function fetchAllActiveForms(targetRole?: string): Promise<StoredFo
             reporting_period: dbf.reporting_period || 'Monthly',
             report_type: dbf.report_type || 'VILLAGE_NUMERICAL',
             target_role: dbf.target_role || 'ALL',
+            employee_wise_submission: dbf.employee_wise_submission ?? false,
             version: dbf.version || 1,
             parent_form_id: dbf.parent_form_id,
             active: dbf.active !== false,
@@ -227,6 +230,7 @@ export async function getFormWithFields(formIdOrCode: string): Promise<StoredFor
             reporting_period: dbForm.reporting_period || 'Monthly',
             report_type: dbForm.report_type || 'VILLAGE_NUMERICAL',
             target_role: dbForm.target_role || 'ALL',
+            employee_wise_submission: dbForm.employee_wise_submission ?? false,
             version: dbForm.version || 1,
             parent_form_id: dbForm.parent_form_id,
             active: dbForm.active !== false,
@@ -265,6 +269,7 @@ export async function getFormWithFields(formIdOrCode: string): Promise<StoredFor
       reporting_period: stdMatch.reporting_period,
       report_type: stdMatch.report_type,
       target_role: stdMatch.target_role,
+      employee_wise_submission: stdMatch.employee_wise_submission ?? false,
       version: 1,
       active: true,
       fields

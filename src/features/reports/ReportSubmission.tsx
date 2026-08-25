@@ -38,6 +38,7 @@ interface FormDefinition {
   reporting_period: string;
   report_type?: string;
   target_role?: string;
+  employee_wise_submission?: boolean;
   fields: FormField[];
 }
 
@@ -144,6 +145,7 @@ export default function ReportSubmission() {
           reporting_period: formObj.reporting_period || 'Monthly',
           report_type: formObj.report_type,
           target_role: formObj.target_role,
+          employee_wise_submission: formObj.employee_wise_submission ?? false,
           fields: mappedFields
         });
 
@@ -355,11 +357,22 @@ export default function ReportSubmission() {
             {form.description && <p className="text-sm text-slate-500 mt-1">{form.description}</p>}
           </div>
         </div>
-        {form.target_role && form.target_role !== 'ALL' && (
-          <span className="px-3 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full border border-purple-200">
-            Role: {form.target_role}
+        <div className="flex flex-wrap items-center gap-2">
+          {form.target_role && form.target_role !== 'ALL' && (
+            <span className="px-3 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full border border-purple-200">
+              Role: {form.target_role}
+            </span>
+          )}
+          <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+            form.employee_wise_submission 
+              ? 'bg-blue-50 text-blue-700 border-blue-200' 
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          }`}>
+            {form.employee_wise_submission 
+              ? (language === 'mr' ? '👤 Employee-wise Submission' : '👤 Employee-wise (Individual)')
+              : (language === 'mr' ? '🏢 Sub-centre Consolidated' : '🏢 Sub-centre Consolidated')}
           </span>
-        )}
+        </div>
       </div>
 
       {/* Alerts */}

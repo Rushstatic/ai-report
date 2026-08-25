@@ -14,7 +14,10 @@ import {
   FileText,
   Layers,
   Sparkles,
-  Database
+  Database,
+  UserCheck,
+  Users,
+  Building2
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,6 +45,7 @@ export default function FormBuilder() {
   const [period, setPeriod] = useState<ReportPeriod>('Monthly');
   const [reportType, setReportType] = useState<ReportType>('VILLAGE_NUMERICAL');
   const [targetRole, setTargetRole] = useState<string>('ALL');
+  const [employeeWiseSubmission, setEmployeeWiseSubmission] = useState<boolean>(false);
   const [fields, setFields] = useState<FormFieldItem[]>([]);
   
   const [isSaving, setIsSaving] = useState(false);
@@ -93,6 +97,7 @@ export default function FormBuilder() {
       setPeriod('Monthly');
       setReportType('VILLAGE_NUMERICAL');
       setTargetRole('ALL');
+      setEmployeeWiseSubmission(false);
       setFields([]);
       setSaveMode('update');
       return;
@@ -110,6 +115,7 @@ export default function FormBuilder() {
     setPeriod((fullForm.reporting_period as ReportPeriod) || 'Monthly');
     setReportType((fullForm.report_type as ReportType) || 'VILLAGE_NUMERICAL');
     setTargetRole(fullForm.target_role || 'ALL');
+    setEmployeeWiseSubmission(fullForm.employee_wise_submission ?? false);
     setFields(fullForm.fields || []);
   };
 
@@ -194,6 +200,7 @@ export default function FormBuilder() {
       setPeriod('Monthly');
       setReportType('VILLAGE_NUMERICAL');
       setTargetRole('ANM');
+      setEmployeeWiseSubmission(false);
       setFields([
         { id: crypto.randomUUID(), labelEn: '1st Trimester ANC Registrations', labelMr: 'पहिल्या तिमाहीत गरोदर माता नोंदणी', type: 'Number', required: true },
         { id: crypto.randomUUID(), labelEn: 'Total High-Risk Pregnancies Identified', labelMr: 'जोखीमयुक्त गरोदर मातांची संख्या', type: 'Number', required: true },
@@ -207,6 +214,7 @@ export default function FormBuilder() {
       setPeriod('Weekly');
       setReportType('VILLAGE_PROGRESS');
       setTargetRole('MPW');
+      setEmployeeWiseSubmission(true);
       setFields([
         { id: crypto.randomUUID(), labelEn: 'Fever Cases Examined', labelMr: 'तपासलेले तापाचे रुग्ण', type: 'Number', required: true },
         { id: crypto.randomUUID(), labelEn: 'Blood Slides Collected (BS)', labelMr: 'घेतलेले रक्त नमुने (BS)', type: 'Number', required: true },
@@ -219,6 +227,7 @@ export default function FormBuilder() {
       setPeriod('Weekly');
       setReportType('VILLAGE_PROGRESS');
       setTargetRole('MPW');
+      setEmployeeWiseSubmission(true);
       setFields([
         { id: crypto.randomUUID(), labelEn: 'Water Sources Inspected', labelMr: 'तपासलेले पाणी स्रोत', type: 'Number', required: true },
         { id: crypto.randomUUID(), labelEn: 'OT Tests Performed', labelMr: 'केलेल्या ओटी चाचण्या', type: 'Number', required: true },
@@ -231,6 +240,7 @@ export default function FormBuilder() {
       setPeriod('Monthly');
       setReportType('VILLAGE_NUMERICAL');
       setTargetRole('CHO');
+      setEmployeeWiseSubmission(false);
       setFields([
         { id: crypto.randomUUID(), labelEn: 'Individuals Screened for Hypertension (30+ yrs)', labelMr: '३० वर्षांवरील रक्तदाब तपासणी', type: 'Number', required: true },
         { id: crypto.randomUUID(), labelEn: 'Individuals Screened for Diabetes', labelMr: 'मधुमेह (डायबेटीस) तपासणी', type: 'Number', required: true },
@@ -295,6 +305,7 @@ export default function FormBuilder() {
       reporting_period: period,
       report_type: reportType,
       target_role: targetRole,
+      employee_wise_submission: employeeWiseSubmission,
       version: nextVersion,
       parent_form_id: finalParentId,
       active: true,
@@ -321,6 +332,7 @@ export default function FormBuilder() {
             description: formDescription.trim(),
             reporting_period: period,
             report_type: reportType,
+            employee_wise_submission: employeeWiseSubmission,
             active: true,
             updated_at: new Date().toISOString()
           };
@@ -342,6 +354,7 @@ export default function FormBuilder() {
             description: formDescription.trim(),
             reporting_period: period,
             report_type: reportType,
+            employee_wise_submission: employeeWiseSubmission,
             active: true
           };
           if (targetRole) insertPayload.target_role = targetRole;
@@ -623,9 +636,20 @@ export default function FormBuilder() {
               <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-xs font-bold rounded-full uppercase">
                 {period} &bull; {targetRole}
               </span>
-              <span className="text-xs text-slate-400 font-medium">
-                {reportType.replace('_', ' ')}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-md border ${
+                  employeeWiseSubmission 
+                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
+                  {employeeWiseSubmission 
+                    ? (language === 'mr' ? '👤 Employee-wise Submission: Yes' : '👤 Individual Employee Submission')
+                    : (language === 'mr' ? '🏢 Sub-centre Consolidated: Yes' : '🏢 Sub-centre Consolidated')}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  {reportType.replace('_', ' ')}
+                </span>
+              </div>
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mt-2">{formName || 'Untitled Form'}</h2>
             {formDescription && <p className="text-sm text-slate-500 mt-1">{formDescription}</p>}
@@ -881,6 +905,122 @@ export default function FormBuilder() {
                   placeholder={language === 'mr' ? 'कर्मचाऱ्यांसाठी माहिती व शेरा...' : 'Brief guidelines for field reporters...'}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 />
+              </div>
+
+              {/* EMPLOYEE-WISE REPORT SUBMISSION RULE */}
+              <div className="sm:col-span-6 bg-gradient-to-r from-blue-50/90 via-slate-50 to-indigo-50/90 border-2 border-blue-200/80 rounded-xl p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded">
+                        {language === 'mr' ? 'सादरीकरण नियम (Submission Rule)' : 'Submission Rule'}
+                      </span>
+                      <span className="text-xs text-blue-900 font-bold">
+                        {language === 'mr' ? 'उपकेंद्र व कर्मचारी नियम' : 'Sub-centre & Employee Policy'}
+                      </span>
+                    </div>
+
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 mt-1.5">
+                      {language === 'mr' 
+                        ? 'Report भरताना Employee-wise submission आवश्यक आहे का?' 
+                        : 'Is Employee-wise submission required for this report?'}
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                      {language === 'mr'
+                        ? 'खालीलपैकी योग्य पर्याय निवडा - यामुळे अहवाल पूर्ण मानण्याची पद्धत व अनुपालन (Compliance) निश्चित होईल.'
+                        : 'Choose whether each health worker must file separately or any staff member can submit on behalf of the sub-centre.'}
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-4">
+                      {/* Option 1: YES - Individual */}
+                      <label 
+                        className={`relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          employeeWiseSubmission
+                            ? 'border-blue-600 bg-white shadow-sm ring-2 ring-blue-500/20'
+                            : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="radio"
+                              name="employeeWiseSubmission"
+                              checked={employeeWiseSubmission === true}
+                              onChange={() => setEmployeeWiseSubmission(true)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300"
+                            />
+                            <span className="font-bold text-slate-900 text-sm">
+                              {language === 'mr' ? '1. Yes – प्रत्येक Employee ने स्वतंत्र report भरावा.' : '1. Yes – Individual report per employee'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 whitespace-nowrap">
+                            Individual
+                          </span>
+                        </div>
+
+                        <div className="mt-3 text-xs text-slate-600 pl-6 space-y-1.5 border-t border-slate-100 pt-2.5">
+                          <p className="font-semibold text-slate-800">
+                            {language === 'mr' ? 'उदा. एका Sub-centre मध्ये:' : 'Example in a Sub-centre:'}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded text-[11px] font-medium">MPW-1 report</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded text-[11px] font-medium">MPW-2 report</span>
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded text-[11px] font-medium">ANM report</span>
+                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[11px] font-medium">CHO report</span>
+                          </div>
+                          <p className="text-[11px] text-blue-700 font-medium pt-1">
+                            {language === 'mr' 
+                              ? '➔ सर्व अहवाल स्वतंत्रपणे अपेक्षित असतील व प्रत्येकाचे अनुपालन वेगवेगळे तपासले जाईल.'
+                              : '➔ Separate reports expected from each employee; compliance is tracked individually.'}
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Option 2: NO - Sub-centre Level */}
+                      <label 
+                        className={`relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          !employeeWiseSubmission
+                            ? 'border-emerald-600 bg-white shadow-sm ring-2 ring-emerald-500/20'
+                            : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="radio"
+                              name="employeeWiseSubmission"
+                              checked={employeeWiseSubmission === false}
+                              onChange={() => setEmployeeWiseSubmission(false)}
+                              className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                            />
+                            <span className="font-bold text-slate-900 text-sm">
+                              {language === 'mr' 
+                                ? '2. No – Sub-centre मधील कोणत्याही एका authorized Employee ने report भरला तरी चालेल.' 
+                                : '2. No – Sub-centre consolidated submission'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                            Sub-centre Level
+                          </span>
+                        </div>
+
+                        <div className="mt-3 text-xs text-slate-600 pl-6 space-y-1.5 border-t border-slate-100 pt-2.5">
+                          <p className="font-semibold text-slate-800">
+                            {language === 'mr' ? 'उपकेंद्र एकत्रित नियम:' : 'Facility consolidated policy:'}
+                          </p>
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200/80 rounded-lg text-[11px] text-emerald-900 font-medium leading-relaxed">
+                            {language === 'mr' 
+                              ? '✓ Sub-centre मधील कोणत्याही authorized employee ने report submit केला की त्या period साठी report complete मानला जाईल.' 
+                              : '✓ Once any authorized employee submits, the report is marked complete for the whole sub-centre for that period.'}
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

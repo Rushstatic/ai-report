@@ -8,6 +8,7 @@ export interface StandardFormDefinition {
   reporting_period: 'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly';
   report_type: 'VILLAGE_NUMERICAL' | 'VILLAGE_PROGRESS' | 'LIST' | 'SUBCENTRE_LEVEL';
   target_role: string;
+  employee_wise_submission?: boolean;
   sections: {
     title: string;
     fields: {
@@ -31,6 +32,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Monthly',
     report_type: 'VILLAGE_NUMERICAL',
     target_role: 'ALL',
+    employee_wise_submission: false,
     sections: [
       {
         title: 'General Health & Morbidity Indicators',
@@ -53,6 +55,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Weekly',
     report_type: 'VILLAGE_PROGRESS',
     target_role: 'MPW',
+    employee_wise_submission: true,
     sections: [
       {
         title: 'Malaria & Vector Surveillance',
@@ -77,6 +80,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Weekly',
     report_type: 'VILLAGE_PROGRESS',
     target_role: 'MPW',
+    employee_wise_submission: true,
     sections: [
       {
         title: 'Water Source & Sanitation Inspection',
@@ -98,6 +102,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Monthly',
     report_type: 'VILLAGE_NUMERICAL',
     target_role: 'ANM',
+    employee_wise_submission: false,
     sections: [
       {
         title: 'Reproductive & Child Health Indicators',
@@ -121,6 +126,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Monthly',
     report_type: 'VILLAGE_NUMERICAL',
     target_role: 'ANM',
+    employee_wise_submission: false,
     sections: [
       {
         title: 'Immunization Coverage Metrics',
@@ -144,6 +150,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Monthly',
     report_type: 'VILLAGE_NUMERICAL',
     target_role: 'CHO',
+    employee_wise_submission: false,
     sections: [
       {
         title: 'NCD & Comprehensive Primary Care Screening',
@@ -167,6 +174,7 @@ export const STANDARD_FORMS: StandardFormDefinition[] = [
     reporting_period: 'Monthly',
     report_type: 'SUBCENTRE_LEVEL',
     target_role: 'CHO',
+    employee_wise_submission: false,
     sections: [
       {
         title: 'Wellness & Community Outreach',
@@ -210,6 +218,7 @@ export async function syncStandardFormsToDatabase(): Promise<{ success: boolean;
             reporting_period: formDef.reporting_period,
             report_type: formDef.report_type,
             target_role: formDef.target_role,
+            employee_wise_submission: formDef.employee_wise_submission ?? false,
             active: true
           })
           .select('id')
