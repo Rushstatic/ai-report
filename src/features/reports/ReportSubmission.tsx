@@ -363,14 +363,25 @@ export default function ReportSubmission() {
               Role: {form.target_role}
             </span>
           )}
+          {/* Format / Scope Badge */}
+          <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+            form.report_type === 'SUBCENTRE_LEVEL'
+              ? 'bg-amber-50 text-amber-800 border-amber-200'
+              : 'bg-blue-50 text-blue-800 border-blue-200'
+          }`}>
+            {form.report_type === 'SUBCENTRE_LEVEL'
+              ? (language === 'mr' ? '🏢 उपकेंद्र स्तर अहवाल' : '🏢 Sub-centre Level Report')
+              : (language === 'mr' ? '🏘️ गावनिहाय अहवाल' : '🏘️ Village-wise Report')}
+          </span>
+          {/* Submission Mode Badge */}
           <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
             form.employee_wise_submission 
-              ? 'bg-blue-50 text-blue-700 border-blue-200' 
+              ? 'bg-purple-50 text-purple-700 border-purple-200' 
               : 'bg-emerald-50 text-emerald-700 border-emerald-200'
           }`}>
             {form.employee_wise_submission 
-              ? (language === 'mr' ? '👤 Employee-wise Submission' : '👤 Employee-wise (Individual)')
-              : (language === 'mr' ? '🏢 Sub-centre Consolidated' : '🏢 Sub-centre Consolidated')}
+              ? (language === 'mr' ? '👤 Employee-wise (स्वतंत्र)' : '👤 Employee-wise (Individual)')
+              : (language === 'mr' ? '👥 उपकेंद्र सादरीकरण' : '👥 Facility Submission')}
           </span>
         </div>
       </div>
@@ -433,10 +444,22 @@ export default function ReportSubmission() {
 
             <div className="bg-white p-3 rounded-lg border border-blue-100/80 shadow-xs">
               <div className="flex items-center gap-1.5 text-slate-400 font-bold uppercase tracking-wider mb-1">
-                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{language === 'mr' ? 'गाव निवडा' : 'Select Village'}</span>
+                {form.report_type === 'SUBCENTRE_LEVEL' ? (
+                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                ) : (
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                )}
+                <span>
+                  {form.report_type === 'SUBCENTRE_LEVEL' 
+                    ? (language === 'mr' ? 'अहवाल स्तर' : 'Report Level')
+                    : (language === 'mr' ? 'गाव निवडा (Village)' : 'Select Village')}
+                </span>
               </div>
-              {villages.length > 0 ? (
+              {form.report_type === 'SUBCENTRE_LEVEL' ? (
+                <span className="font-semibold text-amber-800 text-xs block py-1">
+                  {language === 'mr' ? '🏢 उपकेंद्र स्तर (सर्व गावांचे एकत्रित)' : '🏢 Sub-centre Level (Consolidated)'}
+                </span>
+              ) : villages.length > 0 ? (
                 <select
                   value={selectedVillageId}
                   onChange={(e) => setSelectedVillageId(e.target.value)}
@@ -449,8 +472,8 @@ export default function ReportSubmission() {
                   ))}
                 </select>
               ) : (
-                <span className="font-medium text-slate-700 text-xs">
-                  {language === 'mr' ? 'उपकेंद्र स्तर (एकत्रित)' : 'Sub-centre Consolidated'}
+                <span className="font-medium text-amber-700 text-xs block py-0.5">
+                  {language === 'mr' ? '⚠️ गावे जोडलेली नाहीत' : '⚠️ No villages mapped'}
                 </span>
               )}
             </div>

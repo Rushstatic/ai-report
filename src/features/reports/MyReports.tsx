@@ -399,13 +399,22 @@ export default function MyReports() {
                       <h4 className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">
                         {form.name}
                       </h4>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                        <span className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-1.5">
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium">
                           <Calendar className="w-3 h-3 text-slate-400" />
                           {form.reporting_period || 'Monthly'}
                         </span>
-                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
+                        <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-bold">
                           {form.target_role === 'ALL' ? 'All Roles' : form.target_role || 'General'}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                          form.report_type === 'SUBCENTRE_LEVEL' 
+                            ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                            : 'bg-blue-50 text-blue-800 border-blue-200'
+                        }`}>
+                          {form.report_type === 'SUBCENTRE_LEVEL' 
+                            ? (language === 'mr' ? '🏢 उपकेंद्र स्तर' : '🏢 Sub-centre') 
+                            : (language === 'mr' ? '🏘️ गावनिहाय' : '🏘️ Village-wise')}
                         </span>
                       </div>
                     </div>

@@ -251,6 +251,17 @@ export default function DataEntryList() {
                           Role: {form.target_role}
                         </span>
                       )}
+                      {/* Report Type Badge */}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        form.report_type === 'SUBCENTRE_LEVEL'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-blue-50 text-blue-800 border-blue-200'
+                      }`}>
+                        {form.report_type === 'SUBCENTRE_LEVEL'
+                          ? (language === 'mr' ? '🏢 उपकेंद्र स्तर' : '🏢 Sub-centre Level')
+                          : (language === 'mr' ? '🏘️ गावनिहाय अहवाल' : '🏘️ Village-wise')}
+                      </span>
+                      {/* Submission Rule Badge */}
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                         form.employee_wise_submission
                           ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -258,7 +269,7 @@ export default function DataEntryList() {
                       }`}>
                         {form.employee_wise_submission 
                           ? (language === 'mr' ? '👤 Employee-wise (स्वतंत्र)' : '👤 Individual') 
-                          : (language === 'mr' ? '🏢 Sub-centre Level (एकत्रित)' : '🏢 Sub-centre Level')}
+                          : (language === 'mr' ? '👥 उपकेंद्र सादरीकरण' : '👥 Facility Submission')}
                       </span>
                     </div>
                   </div>
@@ -285,14 +296,20 @@ export default function DataEntryList() {
                           : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
                         {subRec.status === 'Approved' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                        {subRec.status} {form.employee_wise_submission ? '(Your Report)' : '(Sub-centre Submitted)'}
+                        {subRec.status} {form.employee_wise_submission 
+                          ? (language === 'mr' ? '(आपला सादर)' : '(Your Report)') 
+                          : form.report_type === 'SUBCENTRE_LEVEL' 
+                          ? (language === 'mr' ? '(उपकेंद्र सादर)' : '(Sub-centre Done)') 
+                          : (language === 'mr' ? '(गाव अहवाल सादर)' : '(Village Report Done)')}
                       </span>
                     ) : (
                       <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" />
                         {form.employee_wise_submission
                           ? (language === 'mr' ? 'आपला वैयक्तिक अहवाल बाकी' : 'Your submission is due')
-                          : (language === 'mr' ? 'उपकेंद्र अहवाल भरणे बाकी' : 'Sub-centre report due')}
+                          : form.report_type === 'SUBCENTRE_LEVEL'
+                          ? (language === 'mr' ? 'उपकेंद्र अहवाल भरणे बाकी' : 'Sub-centre report due')
+                          : (language === 'mr' ? 'गावनिहाय अहवाल भरणे बाकी' : 'Village report due')}
                       </span>
                     )}
                   </div>
