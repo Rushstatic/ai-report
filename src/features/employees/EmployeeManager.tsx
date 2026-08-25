@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Users, Shield, MapPin, Search } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function EmployeeManager() {
+  const { employee } = useAuth();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -11,9 +13,9 @@ export default function EmployeeManager() {
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     mobile_number: '',
-    employee_type: 'TALUKA_CONTROLLER',
+    employee_type: employee?.employee_type === 'DISTRICT_CONTROLLER' ? 'TALUKA_CONTROLLER' : 'PHC_CONTROLLER',
     designation: '',
-    taluka_id: '',
+    taluka_id: employee?.taluka_id || '',
     phc_id: ''
   });
   
@@ -27,10 +29,20 @@ export default function EmployeeManager() {
   async function fetchData() {
     setLoading(true);
     try {
+      let empQuery = supabase.from('employees').select('*, talukas(name), phcs(name)').order('created_at', { ascending: false });
+      let talQuery = supabase.from('talukas').select('*');
+      let phcQuery = supabase.from('phcs').select('*');
+
+      if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+        empQuery = empQuery.eq('taluka_id', employee.taluka_id);
+        talQuery = talQuery.eq('id', employee.taluka_id);
+        phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
+      }
+
       const [empRes, talRes, phcRes] = await Promise.all([
-        supabase.from('employees').select('*, talukas(name), phcs(name)').order('created_at', { ascending: false }),
-        supabase.from('talukas').select('*'),
-        supabase.from('phcs').select('*')
+        empQuery,
+        talQuery,
+        phcQuery
       ]);
       
       if (empRes.data) setEmployees(empRes.data);
@@ -60,7 +72,7 @@ export default function EmployeeManager() {
       if (error) throw error;
       
       setIsAdding(false);
-      setNewEmployee({ name: '', mobile_number: '', employee_type: 'TALUKA_CONTROLLER', designation: '', taluka_id: '', phc_id: '' });
+      setNewEmployee({ name: '', mobile_number: '', employee_type: employee?.employee_type === 'DISTRICT_CONTROLLER' ? 'TALUKA_CONTROLLER' : 'PHC_CONTROLLER', designation: '', taluka_id: employee?.taluka_id || '', phc_id: '' });
       fetchData();
     } catch (error: any) {
       console.error("Error adding employee", error);
@@ -180,7 +192,9 @@ export default function EmployeeManager() {
                   onChange={(e) => setNewEmployee({...newEmployee, employee_type: e.target.value})}
                   className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 >
-                  <option value="TALUKA_CONTROLLER">Taluka Controller</option>
+                  {employee?.employee_type === 'DISTRICT_CONTROLLER' && (
+                    <option value="TALUKA_CONTROLLER">Taluka Controller</option>
+                  )}
                   <option value="PHC_CONTROLLER">PHC Controller</option>
                   <option value="MPW">MPW</option>
                   <option value="ANM">ANM</option>
@@ -188,13 +202,14 @@ export default function EmployeeManager() {
                 </select>
               </div>
 
-              {(newEmployee.employee_type === 'TALUKA_CONTROLLER' || newEmployee.employee_type === 'PHC_CONTROLLER' || newEmployee.employee_type === 'MPW' || newEmployee.employee_type === 'ANM') && (
+              {(newEmployee.employee_type === 'TALUKA_CONTROLLER' || newEmployee.employee_type === 'PHC_CONTROLLER' || newEmployee.employee_type === 'MPW' || newEmployee.employee_type === 'ANM' || newEmployee.employee_type === 'CHO') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Taluka</label>
                   <select
                     value={newEmployee.taluka_id}
                     onChange={(e) => setNewEmployee({...newEmployee, taluka_id: e.target.value})}
-                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    disabled={employee?.employee_type === 'TALUKA_CONTROLLER'}
+                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   >
                     <option value="">-- Select Taluka --</option>
                     {talukas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -202,7 +217,7 @@ export default function EmployeeManager() {
                 </div>
               )}
 
-              {(newEmployee.employee_type === 'PHC_CONTROLLER' || newEmployee.employee_type === 'MPW' || newEmployee.employee_type === 'ANM') && (
+              {(newEmployee.employee_type === 'PHC_CONTROLLER' || newEmployee.employee_type === 'MPW' || newEmployee.employee_type === 'ANM' || newEmployee.employee_type === 'CHO') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assign to PHC</label>
                   <select

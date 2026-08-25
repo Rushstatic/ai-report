@@ -2,10 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Building2, MapPin, Search, ChevronRight, Check } from 'lucide-react';
 import { useLanguageStore } from '@/store/languageStore';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function HierarchyManager() {
   const { language } = useLanguageStore();
-  const [activeTab, setActiveTab] = useState<'talukas' | 'phcs' | 'subcentres'>('talukas');
+  const { employee } = useAuth();
+  
+  const isDistrictController = employee?.employee_type === 'DISTRICT_CONTROLLER';
+  const isTalukaController = employee?.employee_type === 'TALUKA_CONTROLLER';
+  
+  // Set default tab based on role
+  const [activeTab, setActiveTab] = useState<'talukas' | 'phcs' | 'subcentres'>(
+    isDistrictController ? 'talukas' : 'phcs'
+  );
   
   const [districts, setDistricts] = useState<any[]>([]);
   const [talukas, setTalukas] = useState<any[]>([]);
@@ -18,7 +27,7 @@ export default function HierarchyManager() {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
-  
+
   useEffect(() => {
     fetchHierarchy();
   }, []);
@@ -26,11 +35,30 @@ export default function HierarchyManager() {
   async function fetchHierarchy() {
     setLoading(true);
     try {
+      let talQuery = supabase.from('talukas').select('*, districts(name)');
+      let phcQuery = supabase.from('phcs').select('*, talukas(name)');
+      let scQuery = supabase.from('sub_centres').select('*, phcs(name)');
+
+      if (isTalukaController && employee?.taluka_id) {
+        talQuery = talQuery.eq('id', employee.taluka_id);
+        phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
+        // Note: filtering subcentres by taluka would require a join, but for now we fetch subcentres
+        // where phc_id is in the list of phcs belonging to this taluka
+        const phcList = await supabase.from('phcs').select('id').eq('taluka_id', employee.taluka_id);
+        const phcIds = phcList.data?.map(p => p.id) || [];
+        if (phcIds.length > 0) {
+          scQuery = scQuery.in('phc_id', phcIds);
+        } else {
+          // Force empty if no PHCs exist
+          scQuery = scQuery.eq('phc_id', '00000000-0000-0000-0000-000000000000'); 
+        }
+      }
+
       const [distRes, talRes, phcRes, scRes] = await Promise.all([
         supabase.from('districts').select('*'),
-        supabase.from('talukas').select('*, districts(name)'),
-        supabase.from('phcs').select('*, talukas(name)'),
-        supabase.from('sub_centres').select('*, phcs(name)')
+        talQuery,
+        phcQuery,
+        scQuery
       ]);
       
       if (distRes.data) setDistricts(distRes.data);
@@ -51,7 +79,8 @@ export default function HierarchyManager() {
         const dId = selectedParentId || (districts[0]?.id);
         await supabase.from('talukas').insert({ name: newName, district_id: dId });
       } else if (activeTab === 'phcs') {
-        await supabase.from('phcs').insert({ name: newName, taluka_id: selectedParentId });
+        const tId = isTalukaController ? (employee?.taluka_id || talukas[0]?.id) : selectedParentId;
+        await supabase.from('phcs').insert({ name: newName, taluka_id: tId });
       } else if (activeTab === 'subcentres') {
         await supabase.from('sub_centres').insert({ name: newName, phc_id: selectedParentId });
       }
@@ -64,11 +93,12 @@ export default function HierarchyManager() {
     }
   };
 
-  const tabs = [
-    { id: 'talukas', name: 'Talukas', count: talukas.length },
-    { id: 'phcs', name: 'PHCs', count: phcs.length },
-    { id: 'subcentres', name: 'Sub-centres', count: subcentres.length },
-  ];
+  const tabs = [];
+  if (isDistrictController) {
+    tabs.push({ id: 'talukas', name: 'Talukas', count: talukas.length });
+  }
+  tabs.push({ id: 'phcs', name: 'PHCs', count: phcs.length });
+  tabs.push({ id: 'subcentres', name: 'Sub-centres', count: subcentres.length });
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -80,7 +110,7 @@ export default function HierarchyManager() {
         <button
           onClick={() => {
             setNewName('');
-            setSelectedParentId('');
+            setSelectedParentId(isTalukaController && activeTab === 'phcs' && employee?.taluka_id ? employee.taluka_id : '');
             setIsAdding(true);
           }}
           className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -170,7 +200,8 @@ export default function HierarchyManager() {
                     required
                     value={selectedParentId}
                     onChange={(e) => setSelectedParentId(e.target.value)}
-                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    disabled={isTalukaController}
+                    className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   >
                     <option value="">-- Select Taluka --</option>
                     {talukas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

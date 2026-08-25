@@ -28,12 +28,7 @@ export default function PendingReports() {
         if (data && data.length > 0) {
           setPendingList(data);
         } else {
-          // Generate mock data for the prototype to demonstrate the UI
-          setPendingList([
-            { id: 1, forms: { name: 'Monthly Health Survey', reporting_period: 'Monthly' }, employees: { name: 'Ramesh Patil', employee_type: 'MPW', phcs: { name: 'Ausa PHC' } }, status: 'Overdue', due_date: '2026-08-05' },
-            { id: 2, forms: { name: 'Village Progress Report', reporting_period: 'Monthly' }, employees: { name: 'Sunita Sharma', employee_type: 'ANM', sub_centres: { name: 'Bhada SC' } }, status: 'Overdue', due_date: '2026-08-05' },
-            { id: 3, forms: { name: 'Maternal Health Register', reporting_period: 'Weekly' }, employees: { name: 'Priya Joshi', employee_type: 'CHO', phcs: { name: 'Nilanga PHC' } }, status: 'Pending', due_date: '2026-08-12' },
-          ]);
+          setPendingList([]);
         }
       } catch (error) {
         console.error("Error fetching pending reports", error);

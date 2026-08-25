@@ -20,7 +20,7 @@ export default function MyReports() {
     async function fetchReports() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('report_submissions')
           .select(`
             id,
@@ -29,9 +29,17 @@ export default function MyReports() {
             status,
             submitted_at,
             forms (name, reporting_period),
-            employees (name, employee_type, phcs(name), sub_centres(name))
+            employees!inner (name, employee_type, phcs(name), sub_centres(name), taluka_id)
           `)
           .order('submitted_at', { ascending: false });
+
+        if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+          query = query.eq('employees.taluka_id', employee.taluka_id);
+        } else if (!isController && employee?.id) {
+          query = query.eq('employee_id', employee.id);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         

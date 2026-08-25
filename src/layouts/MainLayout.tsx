@@ -23,14 +23,29 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const navigation = [
-  { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
-  { nameKey: 'nav.myReports', href: '/reports/my', icon: FileText },
-  { nameKey: 'nav.pendingReports', href: '/reports/pending', icon: CheckSquare },
-  { nameKey: 'nav.formBuilder', href: '/forms/builder', icon: Settings },
-  { nameKey: 'nav.employees', href: '/employees', icon: Users },
-  { nameKey: 'nav.hierarchy', href: '/hierarchy', icon: MapPin },
-];
+const getNavigation = (employeeType?: string) => {
+  const isDistrictController = employeeType === 'DISTRICT_CONTROLLER';
+  const isTalukaController = employeeType === 'TALUKA_CONTROLLER';
+  const isPHCController = employeeType === 'PHC_CONTROLLER';
+  const isController = isDistrictController || isTalukaController || isPHCController;
+
+  const nav = [
+    { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
+    { nameKey: 'nav.myReports', href: '/reports/my', icon: FileText },
+  ];
+
+  if (isController) {
+    nav.push({ nameKey: 'nav.pendingReports', href: '/reports/pending', icon: CheckSquare });
+    nav.push({ nameKey: 'nav.employees', href: '/employees', icon: Users });
+    nav.push({ nameKey: 'nav.hierarchy', href: '/hierarchy', icon: MapPin });
+  }
+
+  if (isDistrictController) {
+    nav.push({ nameKey: 'nav.formBuilder', href: '/forms/builder', icon: Settings });
+  }
+
+  return nav;
+};
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -38,6 +53,8 @@ export default function MainLayout() {
   const { language, setLanguage } = useLanguageStore();
   const t = useTranslation(language);
   const { employee, signOut } = useAuth();
+  
+  const navigation = getNavigation(employee?.employee_type);
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] font-sans flex flex-col lg:flex-row overflow-hidden">

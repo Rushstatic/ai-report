@@ -13,6 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { exportToExcel } from '@/utils/excelExport';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
+import { useAuth } from '@/hooks/useAuth';
 
 const mockChartData = [
   { name: 'Taluka A', submitted: 85, pending: 15 },
@@ -23,6 +24,7 @@ const mockChartData = [
 
 export default function Dashboard() {
   const { language } = useLanguageStore();
+  const { employee } = useAuth();
   const t = useTranslation(language);
   const [stats, setStats] = useState({
     talukas: 0,
@@ -36,18 +38,37 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [talukas, phcs, subcentres, employees] = await Promise.all([
-          supabase.from('talukas').select('*', { count: 'exact', head: true }),
-          supabase.from('phcs').select('*', { count: 'exact', head: true }),
-          supabase.from('sub_centres').select('*', { count: 'exact', head: true }),
-          supabase.from('employees').select('*', { count: 'exact', head: true }),
+        let talQuery = supabase.from('talukas').select('*', { count: 'exact', head: true });
+        let phcQuery = supabase.from('phcs').select('*', { count: 'exact', head: true });
+        let scQuery = supabase.from('sub_centres').select('*', { count: 'exact', head: true });
+        let empQuery = supabase.from('employees').select('*', { count: 'exact', head: true });
+
+        if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+          talQuery = talQuery.eq('id', employee.taluka_id);
+          phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
+          empQuery = empQuery.eq('taluka_id', employee.taluka_id);
+          
+          const phcList = await supabase.from('phcs').select('id').eq('taluka_id', employee.taluka_id);
+          const phcIds = phcList.data?.map(p => p.id) || [];
+          if (phcIds.length > 0) {
+            scQuery = scQuery.in('phc_id', phcIds);
+          } else {
+            scQuery = scQuery.eq('phc_id', '00000000-0000-0000-0000-000000000000'); 
+          }
+        }
+
+        const [talukas, phcs, subcentres, employees_count] = await Promise.all([
+          talQuery,
+          phcQuery,
+          scQuery,
+          empQuery,
         ]);
 
         setStats({
-          talukas: talukas.count || 3,
-          phcs: phcs.count || 12,
-          subcentres: subcentres.count || 48,
-          employees: employees.count || 145,
+          talukas: talukas.count || 0,
+          phcs: phcs.count || 0,
+          subcentres: subcentres.count || 0,
+          employees: employees_count.count || 0,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
