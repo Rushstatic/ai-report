@@ -11,7 +11,8 @@ import {
   Building2, 
   Send,
   X,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useLanguageStore } from '@/store/languageStore';
@@ -30,6 +31,7 @@ export default function MyReports() {
   const [loading, setLoading] = useState(true);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const isController = employee?.employee_type?.includes('CONTROLLER');
   const subcentreName = (employee as any)?.sub_centres?.name || 'Sub-centre';
@@ -38,7 +40,7 @@ export default function MyReports() {
     async function fetchReportsAndForms() {
       setLoading(true);
       try {
-        // 1. Fetch reports with sub-centre data isolation
+        // 1. Fetch reports with sub-centre data isolation from Supabase
         let query = supabase
           .from('report_submissions')
           .select(`
@@ -68,51 +70,13 @@ export default function MyReports() {
 
         const { data, error } = await query;
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           setReports(data);
         } else {
-          // Clean fallback mock data scoped strictly to employee's subcentre
-          setReports([
-            { 
-              id: 'rep-1', 
-              form_id: 'f-1',
-              forms: { name: 'Monthly Sub-centre Report', reporting_period: 'Monthly', target_role: 'ALL' }, 
-              period_start: '2026-08-01', 
-              period_end: '2026-08-31', 
-              status: 'Approved', 
-              submitted_at: '2026-08-05T10:00:00Z', 
-              employee_id: employee?.id,
-              villages: { name: 'Bhada' },
-              employees: { name: employee?.name || 'Suresh K.', employee_type: employee?.employee_type || 'MPW', sub_centres: { name: subcentreName } } 
-            },
-            { 
-              id: 'rep-2', 
-              form_id: 'f-2',
-              forms: { name: 'Weekly Disease Surveillance', reporting_period: 'Weekly', target_role: 'MPW' }, 
-              period_start: '2026-08-01', 
-              period_end: '2026-08-07', 
-              status: 'Submitted', 
-              submitted_at: '2026-08-12T14:30:00Z', 
-              employee_id: 'other-emp-id',
-              villages: { name: 'Bhada Wadi' },
-              employees: { name: 'Anita Shinde (ANM)', employee_type: 'ANM', sub_centres: { name: subcentreName } } 
-            },
-            { 
-              id: 'rep-3', 
-              form_id: 'f-3',
-              forms: { name: 'Maternal Care Progress', reporting_period: 'Monthly', target_role: 'ANM' }, 
-              period_start: '2026-07-01', 
-              period_end: '2026-07-31', 
-              status: 'Approved', 
-              submitted_at: '2026-07-30T09:15:00Z', 
-              employee_id: employee?.id,
-              villages: { name: 'Bhada' },
-              employees: { name: employee?.name || 'Suresh K.', employee_type: employee?.employee_type || 'MPW', sub_centres: { name: subcentreName } } 
-            },
-          ]);
+          setReports([]);
         }
 
-        // 2. Fetch Available forms for Employee's role
+        // 2. Fetch Available forms for Employee's role from live forms table
         const empRole = (employee?.employee_type || 'MPW').toUpperCase();
         const { data: fData } = await (supabase
           .from('forms') as any)
@@ -131,21 +95,7 @@ export default function MyReports() {
           });
         }
 
-        if (matchedForms.length > 0) {
-          setAvailableForms(matchedForms);
-        } else {
-          const defaultRoleForms: any[] = [
-            { id: 'f-monthly-sc', name: 'Monthly Sub-centre Composite Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)', reporting_period: 'Monthly', target_role: 'ALL' },
-            { id: 'f-malaria-mpw', name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप अहवाल)', reporting_period: 'Weekly', target_role: 'MPW' },
-            { id: 'f-water-mpw', name: 'Drinking Water Quality & Chlorination Log (पिण्याचे पाणी तपासणी)', reporting_period: 'Weekly', target_role: 'MPW' },
-            { id: 'f-rch-anm', name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन अहवाल)', reporting_period: 'Monthly', target_role: 'ANM' },
-            { id: 'f-immunization-anm', name: 'Routine Immunization Coverage Report (नियमित लसीकरण अहवाल)', reporting_period: 'Monthly', target_role: 'ANM' },
-            { id: 'f-ncd-cho', name: 'HWC NCD Screening & Teleconsultation Progress (NCD तपासणी व टेलीमेडिसिन)', reporting_period: 'Monthly', target_role: 'CHO' },
-            { id: 'f-wellness-cho', name: 'HWC Wellness Activities & Yoga Sessions (आरोग्य वर्धिनी वेलनेस नोंद)', reporting_period: 'Monthly', target_role: 'CHO' },
-          ];
-
-          setAvailableForms(defaultRoleForms.filter(f => f.target_role === 'ALL' || f.target_role === empRole));
-        }
+        setAvailableForms(matchedForms);
 
       } catch (error) {
         console.error("Error fetching reports", error);
@@ -164,26 +114,71 @@ export default function MyReports() {
     return true;
   });
 
-  const handleDownloadPDF = (report: any) => {
-    const headers = ['Metric / Indication', 'Value reported', 'Remarks'];
-    const data = [
-      ['Total Fever Cases', '45', 'Normal range'],
-      ['TB Suspects Identified', '2', 'Referred to PHC for sputum test'],
-      ['New ANC Registrations', '12', 'All registered in portal'],
-      ['Total OPD', '156', ''],
-      ['Essential Drugs Stockout', 'None', 'Adequate supply'],
-    ];
+  const handleDownloadPDF = async (report: any) => {
+    setDownloadingId(report.id);
+    try {
+      // Fetch live submission values from database
+      const { data: valuesData } = await (supabase
+        .from('report_submission_values') as any)
+        .select(`
+          value_text,
+          value_numeric,
+          value_boolean,
+          value_date,
+          field_id,
+          form_fields (
+            label_en,
+            label_mr,
+            name
+          )
+        `)
+        .eq('submission_id', report.id);
 
-    exportToPDF(headers, data, {
-      filename: `${report.forms?.name?.replace(/\s+/g, '_')}_${report.period_start}`,
-      title: report.forms?.name || 'Report',
-      district: 'Latur',
-      taluka: 'All',
-      phc: report.employees?.phcs?.name || 'N/A',
-      subcentre: report.employees?.sub_centres?.name || 'N/A',
-      period: `${report.period_start} to ${report.period_end}`,
-      generatedBy: report.employees?.name || 'System'
-    });
+      const headers = [
+        language === 'mr' ? 'आरोग्य निर्देशक / बाब' : 'Metric / Indication',
+        language === 'mr' ? 'नोंदवलेली माहिती (Value)' : 'Reported Value',
+        language === 'mr' ? 'स्थिती' : 'Status'
+      ];
+
+      let data: any[][] = [];
+
+      if (valuesData && valuesData.length > 0) {
+        data = valuesData.map((val: any) => {
+          const label = language === 'mr' 
+            ? (val.form_fields?.label_mr || val.form_fields?.label_en || val.form_fields?.name || 'Indicator')
+            : (val.form_fields?.label_en || val.form_fields?.label_mr || val.form_fields?.name || 'Indicator');
+
+          let displayedVal = '';
+          if (val.value_numeric !== null && val.value_numeric !== undefined) displayedVal = String(val.value_numeric);
+          else if (val.value_boolean !== null && val.value_boolean !== undefined) displayedVal = val.value_boolean ? 'Yes (होय)' : 'No (नाही)';
+          else if (val.value_date) displayedVal = String(val.value_date);
+          else displayedVal = val.value_text || '-';
+
+          return [label, displayedVal, report.status || 'Submitted'];
+        });
+      } else {
+        data = [
+          ['Sub-centre Level Submission', 'Completed', report.status || 'Submitted'],
+          ['Reporting Village', report.villages?.name || report.employees?.sub_centres?.name || 'Sub-centre Area', 'Recorded'],
+          ['Submission Timestamp', report.submitted_at ? new Date(report.submitted_at).toLocaleString() : 'Draft', 'Verified']
+        ];
+      }
+
+      exportToPDF(headers, data, {
+        filename: `${report.forms?.name?.replace(/\s+/g, '_')}_${report.period_start}`,
+        title: report.forms?.name || 'Health Report',
+        district: 'District Health Office',
+        taluka: 'District Area',
+        phc: report.employees?.phcs?.name || 'PHC',
+        subcentre: report.employees?.sub_centres?.name || 'Sub-centre',
+        period: `${report.period_start} to ${report.period_end}`,
+        generatedBy: report.employees?.name || 'Staff'
+      });
+    } catch (err) {
+      console.error('Error exporting PDF:', err);
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -213,13 +208,6 @@ export default function MyReports() {
             >
               <PlusCircle className="w-4 h-4" />
               {language === 'mr' ? 'नवीन अहवाल भरा' : 'Submit New Report'}
-            </button>
-          )}
-
-          {isController && (
-            <button className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 shadow-xs text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50">
-              <Filter className="w-4 h-4" />
-              Filter
             </button>
           )}
         </div>
@@ -348,9 +336,14 @@ export default function MyReports() {
                           )}
                           <button 
                             onClick={() => handleDownloadPDF(report)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold transition-colors"
+                            disabled={downloadingId === report.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold transition-colors disabled:opacity-50"
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            {downloadingId === report.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5" />
+                            )}
                             PDF
                           </button>
                         </div>
@@ -388,38 +381,44 @@ export default function MyReports() {
             </div>
 
             <div className="mt-4 space-y-3 max-h-80 overflow-y-auto">
-              {availableForms.map((form) => (
-                <div 
-                  key={form.id}
-                  className="p-3.5 border border-slate-200 hover:border-blue-400 rounded-xl transition-all hover:bg-blue-50/50 flex items-center justify-between group cursor-pointer"
-                  onClick={() => {
-                    setShowSubmitModal(false);
-                    navigate(`/reports/submit/${form.id}`);
-                  }}
-                >
-                  <div>
-                    <h4 className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">
-                      {form.name}
-                    </h4>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
-                        {form.reporting_period || 'Monthly'}
-                      </span>
-                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
-                        {form.target_role === 'ALL' ? 'All Roles' : form.target_role || 'General'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-xs group-hover:bg-blue-700 transition-colors"
-                  >
-                    <Send className="w-3 h-3" />
-                    {language === 'mr' ? 'भरा' : 'Fill'}
-                  </button>
+              {availableForms.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs italic">
+                  {language === 'mr' ? 'कोणतेही अहवाल उपलब्ध नाहीत.' : 'No active forms found in database.'}
                 </div>
-              ))}
+              ) : (
+                availableForms.map((form) => (
+                  <div 
+                    key={form.id}
+                    className="p-3.5 border border-slate-200 hover:border-blue-400 rounded-xl transition-all hover:bg-blue-50/50 flex items-center justify-between group cursor-pointer"
+                    onClick={() => {
+                      setShowSubmitModal(false);
+                      navigate(`/reports/submit/${form.id}`);
+                    }}
+                  >
+                    <div>
+                      <h4 className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">
+                        {form.name}
+                      </h4>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          {form.reporting_period || 'Monthly'}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
+                          {form.target_role === 'ALL' ? 'All Roles' : form.target_role || 'General'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-xs group-hover:bg-blue-700 transition-colors"
+                    >
+                      <Send className="w-3 h-3" />
+                      {language === 'mr' ? 'भरा' : 'Fill'}
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">

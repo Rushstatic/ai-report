@@ -1,35 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, ArrowLeft, Save, AlertCircle, CheckCircle2, MapPin, Calendar, Building2 } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Save, 
+  Send, 
+  Calendar, 
+  Building2, 
+  MapPin, 
+  AlertCircle, 
+  CheckCircle2, 
+  FileText,
+  UserCheck
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
+import { syncStandardFormsToDatabase } from '@/utils/syncForms';
 
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
 
-interface FormFieldOption {
-  id: string;
-  label_en: string;
-  label_mr: string;
-  value: string;
-}
-
 interface FormField {
   id: string;
+  name: string;
   label_en: string;
   label_mr: string;
-  name: string;
   field_type: FieldType;
   is_required: boolean;
-  options?: FormFieldOption[];
+  options?: { id: string; label_en: string; label_mr: string; value: string }[];
 }
 
-interface Form {
+interface FormDefinition {
   id: string;
   name: string;
-  description: string | null;
+  code?: string;
+  description: string;
   reporting_period: string;
-  report_type: string;
+  report_type?: string;
   target_role?: string;
   fields: FormField[];
 }
@@ -46,191 +52,126 @@ export default function ReportSubmission() {
   const { employee } = useAuth();
   const { language } = useLanguageStore();
 
-  const [form, setForm] = useState<Form | null>(null);
+  const isEditMode = !!submissionId;
+
+  const [form, setForm] = useState<FormDefinition | null>(null);
   const [villages, setVillages] = useState<Village[]>([]);
   const [selectedVillageId, setSelectedVillageId] = useState<string>('');
-  const [periodStart, setPeriodStart] = useState<string>(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-  );
-  const [periodEnd, setPeriodEnd] = useState<string>(
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]
-  );
-  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [periodStart, setPeriodStart] = useState<string>('');
+  const [periodEnd, setPeriodEnd] = useState<string>('');
+  
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const isEditMode = !!submissionId;
+  // Set default period (Current month)
+  useEffect(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    setPeriodStart(firstDay);
+    setPeriodEnd(lastDay);
+  }, []);
 
   useEffect(() => {
     async function loadData() {
+      if (!formId && !submissionId) return;
       setLoading(true);
       setError(null);
+
       try {
-        // 1. Fetch Form Definition
-        let formObj: Form | null = null;
-        if (formId && formId !== 'mock-id') {
-          const { data: dbForm, error: formErr } = await (supabase
-            .from('forms') as any)
-            .select('*')
-            .eq('id', formId)
+        let activeFormId = formId;
+
+        // If editing an existing submission, get its form_id first
+        if (submissionId) {
+          const { data: subRec, error: subRecErr } = await (supabase
+            .from('report_submissions') as any)
+            .select('form_id')
+            .eq('id', submissionId)
             .single();
 
-          if (!formErr && dbForm) {
-            // Fetch Sections & Fields
-            const { data: sections } = await (supabase
-              .from('form_sections') as any)
-              .select('id')
-              .eq('form_id', formId);
-
-            let fieldsList: FormField[] = [];
-            if (sections && sections.length > 0) {
-              const secIds = sections.map((s: any) => s.id);
-              const { data: dbFields } = await (supabase
-                .from('form_fields') as any)
-                .select('*, form_field_options(*)')
-                .in('section_id', secIds)
-                .order('display_order');
-
-              if (dbFields) {
-                fieldsList = dbFields.map((f: any) => ({
-                  id: f.id,
-                  name: f.name,
-                  label_en: f.label_en,
-                  label_mr: f.label_mr,
-                  field_type: f.field_type as FieldType,
-                  is_required: f.is_required,
-                  options: f.form_field_options || []
-                }));
-              }
-            }
-
-            formObj = {
-              id: dbForm.id,
-              name: dbForm.name,
-              description: dbForm.description,
-              reporting_period: dbForm.reporting_period,
-              report_type: dbForm.report_type,
-              target_role: dbForm.target_role,
-              fields: fieldsList.length > 0 ? fieldsList : [
-                { id: 'f1', name: 'fever_cases', label_en: 'Total Fever Cases', label_mr: 'एकूण तापाचे रुग्ण', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'tb_suspects', label_en: 'TB Suspects Identified', label_mr: 'क्षयरोग संशयित', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'anc_reg', label_en: 'New ANC Registrations', label_mr: 'नवीन माता नोंदणी', field_type: 'Number', is_required: false },
-                { id: 'f4', name: 'remarks', label_en: 'Remarks / Notes', label_mr: 'शेरा', field_type: 'Text', is_required: false },
-              ]
-            };
+          if (subRecErr) throw subRecErr;
+          if (subRec?.form_id) {
+            activeFormId = subRec.form_id;
           }
         }
 
-        // Fallback form if not found in db
-        if (!formObj) {
-          const roleFormTemplates: Record<string, any> = {
-            'f-malaria-mpw': {
-              id: 'f-malaria-mpw',
-              name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप व किटकजन्य रोग साप्ताहिक अहवाल)',
-              description: 'BSER, fever cases, blood slide collection, and vector control field log.',
-              reporting_period: 'Weekly',
-              target_role: 'MPW',
-              fields: [
-                { id: 'f1', name: 'fever_cases_total', label_en: 'Total Fever Cases Examined', label_mr: 'तपासलेले एकूण तापाचे रुग्ण', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'bs_collected', label_en: 'Blood Smears (BS) Collected', label_mr: 'घेतलेले रक्त नमुने (BS)', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'rdt_performed', label_en: 'Malaria Rapid Tests (RDT) Done', label_mr: 'मलेरिया जलद निदान चाचण्या (RDT)', field_type: 'Number', is_required: false },
-                { id: 'f4', name: 'malaria_positive', label_en: 'Malaria Positive Cases (Pv / Pf)', label_mr: 'मलेरिया बाधित रुग्ण (Pv / Pf)', field_type: 'Number', is_required: true },
-                { id: 'f5', name: 'dengue_suspects', label_en: 'Suspected Dengue / Chikungunya Cases', label_mr: 'संशयित डेंग्यू / चिकनगुनिया रुग्ण', field_type: 'Number', is_required: false },
-                { id: 'f6', name: 'tethis_wells_checked', label_en: 'Guppy Fish Release / Water Bodies Checked', label_mr: 'गप्पी मासे सोडलेली / तपासलेली जलसाठे', field_type: 'Number', is_required: false },
-              ]
-            },
-            'f-water-mpw': {
-              id: 'f-water-mpw',
-              name: 'Drinking Water Quality & TCL Testing Log (पिण्याचे पाणी व टीसीएल क्लोरीनेशन नोंद)',
-              description: 'OT test, chlorination levels in village water tanks, and sanitary survey.',
-              reporting_period: 'Weekly',
-              target_role: 'MPW',
-              fields: [
-                { id: 'f1', name: 'sources_inspected', label_en: 'Water Sources Inspected', label_mr: 'तपासलेले एकूण पिण्याच्या पाण्याचे स्त्रोत', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'ot_tests_positive', label_en: 'OT Tests Positive (Proper Chlorine)', label_mr: 'ओटी टेस्ट योग्य आढळलेले नमुने (योग्य क्लोरिन)', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'ot_tests_zero', label_en: 'OT Tests Zero (Nil Chlorine)', label_mr: 'ओटी टेस्ट निरंक आढळलेले नमुने (क्लोरिन नसलेले)', field_type: 'Number', is_required: true },
-                { id: 'f4', name: 'tcl_sample_collected', label_en: 'TCL Powder Samples Sent for Testing', label_mr: 'प्रयोगशाळेत तपासणीस पाठवलेले टीसीएल नमुने', field_type: 'Number', is_required: false },
-              ]
-            },
-            'f-rch-anm': {
-              id: 'f-rch-anm',
-              name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन मासिक प्रगती अहवाल)',
-              description: 'ANC 1st trimester, high-risk pregnancies, institutional deliveries, and PNC.',
-              reporting_period: 'Monthly',
-              target_role: 'ANM',
-              fields: [
-                { id: 'f1', name: 'anc_total_registered', label_en: 'Total Pregnant Women Registered', label_mr: 'नोंदणीकृत एकूण गरोदर माता', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'anc_1st_trimester', label_en: 'ANC Registered within 12 Weeks (1st Trimester)', label_mr: 'पहिल्या ३ महिन्यात (१२ आठवड्यात) नोंदणी', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'high_risk_pregnancies', label_en: 'High Risk Pregnancies (HRP) Tracked', label_mr: 'जोखीमयुक्त गरोदर माता (HRP) शोध व पाठपुरावा', field_type: 'Number', is_required: true },
-                { id: 'f4', name: 'institutional_deliveries', label_en: 'Institutional Deliveries (Govt/Pvt)', label_mr: 'संस्थात्मक प्रसूती (शासकीय/खाजगी)', field_type: 'Number', is_required: true },
-                { id: 'f5', name: 'pnc_48_hrs_visits', label_en: 'PNC Visits Completed within 48 Hours', label_mr: 'प्रसूतीनंतर ४८ तासांत तपासणी पूर्ण', field_type: 'Number', is_required: false },
-              ]
-            },
-            'f-immunization-anm': {
-              id: 'f-immunization-anm',
-              name: 'Routine Immunization & Session Site Report (नियमित लसीकरण व सत्र अहवाल)',
-              description: 'Infant vaccines (BCG, Penta, MR), dropout tracking, and RI session performance.',
-              reporting_period: 'Monthly',
-              target_role: 'ANM',
-              fields: [
-                { id: 'f1', name: 'sessions_planned', label_en: 'RI Sessions Planned', label_mr: 'नियोजित लसीकरण सत्रे', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'sessions_held', label_en: 'RI Sessions Actually Held', label_mr: 'प्रत्यक्ष पार पडलेली सत्रे', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'bcg_given', label_en: 'BCG Given to Newborns', label_mr: 'BCG लस दिलेले बालके', field_type: 'Number', is_required: true },
-                { id: 'f4', name: 'pentavalent_3', label_en: 'Pentavalent-3 / Rotavirus-3 Completed', label_mr: 'पेंटाव्हॅलेंट-३ पूर्ण केलेली बालके', field_type: 'Number', is_required: true },
-                { id: 'f5', name: 'mr_1st_dose', label_en: 'MR 1st Dose (9-12 Months)', label_mr: 'गोवर-रुबेला (MR) पहिली मात्रा पूर्ण', field_type: 'Number', is_required: true },
-                { id: 'f6', name: 'fully_immunized', label_en: 'Fully Immunized Children (0-1 Year)', label_mr: 'पूर्ण लसीकरण झालेली बालके (०-१ वर्ष)', field_type: 'Number', is_required: true },
-              ]
-            },
-            'f-ncd-cho': {
-              id: 'f-ncd-cho',
-              name: 'HWC NCD Screening & Teleconsultation Log (NCD असंसर्गजन्य रोग तपासणी व टेलीमेडिसिन)',
-              description: 'Hypertension, Diabetes, Cancer screening (30+ pop) and e-Sanjeevani teleconsults.',
-              reporting_period: 'Monthly',
-              target_role: 'CHO',
-              fields: [
-                { id: 'f1', name: 'cbac_forms_filled', label_en: 'CBAC Forms Filled (Age 30+)', label_mr: 'भरलेले सीबॅक (CBAC) फॉर्म (वय ३०+)', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'screened_hypertension', label_en: 'Individuals Screened for Hypertension (BP)', label_mr: 'रक्तदाब तपासणी केलेले व्यक्ती', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'screened_diabetes', label_en: 'Individuals Screened for Diabetes (Blood Sugar)', label_mr: 'मधुमेह (Blood Sugar) तपासलेले व्यक्ती', field_type: 'Number', is_required: true },
-                { id: 'f4', name: 'oral_cancer_screened', label_en: 'Oral / Breast / Cervical Cancer Screenings', label_mr: 'कर्करोग (कॅन्सर) पूर्व तपासणी', field_type: 'Number', is_required: false },
-                { id: 'f5', name: 'teleconsultations_done', label_en: 'e-Sanjeevani Teleconsultations Completed', label_mr: 'ई-संजीवनी द्वारे तज्ज्ञ डॉक्टरांशी सल्लामसलत', field_type: 'Number', is_required: true },
-              ]
-            },
-            'f-wellness-cho': {
-              id: 'f-wellness-cho',
-              name: 'HWC Wellness Activities & Community Health Day (आरोग्य वर्धिनी वेलनेस व योग सत्र)',
-              description: 'Yoga sessions, VHSNC meetings, adolescent health days, and wellness log.',
-              reporting_period: 'Monthly',
-              target_role: 'CHO',
-              fields: [
-                { id: 'f1', name: 'yoga_sessions', label_en: 'Yoga / Physical Activity Sessions Conducted', label_mr: 'पार पडलेले योग व व्यायाम सत्रे', field_type: 'Number', is_required: true },
-                { id: 'f2', name: 'participants_wellness', label_en: 'Total Participants in Wellness Sessions', label_mr: 'वेलनेस सत्रातील एकूण सहभागी नागरिक', field_type: 'Number', is_required: true },
-                { id: 'f3', name: 'vhsnc_meetings', label_en: 'VHSNC Meetings Attended', label_mr: 'ग्राम आरोग्य पाणीपुरवठा व स्वच्छता समिती (VHSNC) बैठका', field_type: 'Number', is_required: false },
-                { id: 'f4', name: 'jashn_e_zindagi', label_en: 'Health Promotion & Awareness Days Observed', label_mr: 'आरोग्य दिन व जनजागृती कार्यक्रम', field_type: 'Number', is_required: false },
-              ]
-            }
-          };
-
-          formObj = (formId && roleFormTemplates[formId]) ? roleFormTemplates[formId] : {
-            id: formId || 'default-form',
-            name: 'Monthly Sub-centre Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)',
-            description: 'Please enter the accurate numerical data for your assigned sub-centre.',
-            reporting_period: 'Monthly',
-            report_type: 'VILLAGE_NUMERICAL',
-            target_role: 'ALL',
-            fields: [
-              { id: 'f1', name: 'fever_cases', label_en: 'Total Fever Cases', label_mr: 'एकूण तापाचे रुग्ण', field_type: 'Number', is_required: true },
-              { id: 'f2', name: 'tb_suspects', label_en: 'TB Suspects Identified', label_mr: 'क्षयरोग संशयित', field_type: 'Number', is_required: true },
-              { id: 'f3', name: 'anc_reg', label_en: 'New ANC Registrations', label_mr: 'नवीन माता नोंदणी', field_type: 'Number', is_required: false },
-              { id: 'f4', name: 'immunized_count', label_en: 'Children Immunized', label_mr: 'लसीकरण केलेले बालके', field_type: 'Number', is_required: false },
-              { id: 'f5', name: 'remarks', label_en: 'Remarks / Notes', label_mr: 'शेरा व नोंदी', field_type: 'Text', is_required: false },
-            ]
-          };
+        if (!activeFormId) {
+          setError('No form identifier provided.');
+          setLoading(false);
+          return;
         }
+
+        // 1. Fetch form definition and its fields from Supabase
+        const fetchFormDetails = async (targetId: string) => {
+          const { data: dbForm } = await (supabase
+            .from('forms') as any)
+            .select('*')
+            .or(`id.eq.${targetId},code.eq.${targetId}`)
+            .maybeSingle();
+
+          if (!dbForm) return null;
+
+          // Fetch Sections & Fields for this form
+          const { data: sections } = await (supabase
+            .from('form_sections') as any)
+            .select('id, title, display_order')
+            .eq('form_id', dbForm.id)
+            .order('display_order');
+
+          let fieldsList: FormField[] = [];
+          if (sections && sections.length > 0) {
+            const secIds = sections.map((s: any) => s.id);
+            const { data: dbFields } = await (supabase
+              .from('form_fields') as any)
+              .select('*, form_field_options(*)')
+              .in('section_id', secIds)
+              .order('display_order');
+
+            if (dbFields) {
+              fieldsList = dbFields.map((f: any) => ({
+                id: f.id,
+                name: f.name,
+                label_en: f.label_en || f.name,
+                label_mr: f.label_mr || f.name,
+                field_type: (f.field_type as FieldType) || 'Text',
+                is_required: !!f.is_required,
+                options: f.form_field_options || []
+              }));
+            }
+          }
+
+          return {
+            id: dbForm.id,
+            name: dbForm.name,
+            code: dbForm.code,
+            description: dbForm.description || '',
+            reporting_period: dbForm.reporting_period || 'Monthly',
+            report_type: dbForm.report_type,
+            target_role: dbForm.target_role,
+            fields: fieldsList
+          };
+        };
+
+        let formObj = await fetchFormDetails(activeFormId);
+
+        // If form or its fields are not present in database yet, auto-sync standard templates to live DB
+        if (!formObj || formObj.fields.length === 0) {
+          await syncStandardFormsToDatabase();
+          formObj = await fetchFormDetails(activeFormId);
+        }
+
+        if (!formObj) {
+          setError('The requested form was not found in the database.');
+          setLoading(false);
+          return;
+        }
+
         setForm(formObj);
 
-        // 2. Fetch Villages only belonging to Employee's Sub-centre
+        // 2. Fetch live Villages for Employee's Sub-centre
         if (employee?.sub_centre_id) {
           const { data: vData } = await (supabase
             .from('villages') as any)
@@ -242,28 +183,30 @@ export default function ReportSubmission() {
             setVillages(vData);
             setSelectedVillageId(vData[0].id);
           } else {
-            setVillages([{ id: 'mock-v1', name: 'Bhada (भादा)' }]);
-            setSelectedVillageId('mock-v1');
+            setVillages([]);
+            setSelectedVillageId('');
           }
         } else {
-          // If controller or no sub_centre_id set, fetch default villages
-          const { data: vData } = await (supabase.from('villages') as any).select('id, name, village_code').limit(10);
+          // Controller or General user
+          const { data: vData } = await (supabase.from('villages') as any).select('id, name, village_code').limit(20);
           if (vData && vData.length > 0) {
             setVillages(vData);
             setSelectedVillageId(vData[0].id);
           } else {
-            setVillages([{ id: 'mock-v1', name: 'Sub-centre Area Village' }]);
-            setSelectedVillageId('mock-v1');
+            setVillages([]);
+            setSelectedVillageId('');
           }
         }
 
-        // 3. If Edit Mode, fetch submission values
+        // 3. If Edit Mode, fetch live submission record and values
         if (submissionId) {
-          const { data: subData } = await (supabase
+          const { data: subData, error: subDataErr } = await (supabase
             .from('report_submissions') as any)
             .select('*, report_submission_values(*)')
             .eq('id', submissionId)
             .single();
+
+          if (subDataErr) throw subDataErr;
 
           if (subData) {
             if (subData.village_id) setSelectedVillageId(subData.village_id);
@@ -273,17 +216,23 @@ export default function ReportSubmission() {
             const initialVals: Record<string, any> = {};
             if (subData.report_submission_values) {
               subData.report_submission_values.forEach((valRow: any) => {
-                if (valRow.value_numeric !== null) initialVals[valRow.field_id] = valRow.value_numeric;
-                else if (valRow.value_boolean !== null) initialVals[valRow.field_id] = valRow.value_boolean ? 'yes' : 'no';
-                else if (valRow.value_date !== null) initialVals[valRow.field_id] = valRow.value_date;
-                else initialVals[valRow.field_id] = valRow.value_text || '';
+                if (valRow.value_numeric !== null && valRow.value_numeric !== undefined) {
+                  initialVals[valRow.field_id] = valRow.value_numeric;
+                } else if (valRow.value_boolean !== null && valRow.value_boolean !== undefined) {
+                  initialVals[valRow.field_id] = valRow.value_boolean ? 'yes' : 'no';
+                } else if (valRow.value_date) {
+                  initialVals[valRow.field_id] = valRow.value_date;
+                } else {
+                  initialVals[valRow.field_id] = valRow.value_text || '';
+                }
               });
             }
             setFormData(initialVals);
           }
         }
-      } catch (err) {
-        console.warn('Error loading form data', err);
+      } catch (err: any) {
+        console.error('Error loading form data:', err);
+        setError(err.message || 'Error loading live form data.');
       } finally {
         setLoading(false);
       }
@@ -322,7 +271,7 @@ export default function ReportSubmission() {
       let subId = submissionId;
 
       if (isEditMode && subId) {
-        // Update existing report submission
+        // Update existing report submission in Supabase
         const { error: updateErr } = await (supabase
           .from('report_submissions') as any)
           .update({
@@ -341,7 +290,7 @@ export default function ReportSubmission() {
         // Delete old values and re-insert fresh
         await (supabase.from('report_submission_values') as any).delete().eq('submission_id', subId);
       } else {
-        // Insert new report submission
+        // Insert new report submission into Supabase
         const { data: newSub, error: insertErr } = await (supabase
           .from('report_submissions') as any)
           .insert({
@@ -368,14 +317,15 @@ export default function ReportSubmission() {
           return {
             submission_id: subId,
             field_id: f.id,
-            value_text: typeof rawVal === 'string' ? rawVal : (rawVal !== undefined ? String(rawVal) : null),
+            value_text: typeof rawVal === 'string' ? rawVal : (rawVal !== undefined && rawVal !== null ? String(rawVal) : null),
             value_numeric: f.field_type === 'Number' && rawVal !== undefined && rawVal !== '' ? Number(rawVal) : null,
             value_boolean: f.field_type === 'Yes/No' ? rawVal === 'yes' : null,
             value_date: f.field_type === 'Date' && rawVal ? rawVal : null
           };
         });
 
-        await (supabase.from('report_submission_values') as any).insert(valuesToInsert);
+        const { error: valsErr } = await (supabase.from('report_submission_values') as any).insert(valuesToInsert);
+        if (valsErr) throw valsErr;
       }
 
       setSuccessMsg(
@@ -389,11 +339,8 @@ export default function ReportSubmission() {
       }, 1200);
 
     } catch (err: any) {
-      console.warn('Submission error, fallback simulated success for UI preview:', err);
-      setSuccessMsg(isEditMode ? 'Report updated successfully!' : 'Report submitted successfully!');
-      setTimeout(() => {
-        navigate('/reports/my');
-      }, 1200);
+      console.error('Submission error:', err);
+      setError(err.message || 'Failed to submit report.');
     } finally {
       setSubmitting(false);
     }
@@ -459,7 +406,7 @@ export default function ReportSubmission() {
       )}
 
       {/* Form Content */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
         {/* Jurisdiction & Context Card */}
         <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -491,7 +438,9 @@ export default function ReportSubmission() {
                   ))}
                 </select>
               ) : (
-                <span className="font-medium text-slate-700 text-xs">Sub-centre Consolidated</span>
+                <span className="font-medium text-slate-700 text-xs">
+                  {language === 'mr' ? 'उपकेंद्र स्तर (एकत्रित)' : 'Sub-centre Consolidated'}
+                </span>
               )}
             </div>
 
@@ -507,96 +456,102 @@ export default function ReportSubmission() {
           </div>
         </div>
 
-        {/* Dynamic Fields */}
+        {/* Dynamic Fields from Live Database */}
         <div className="p-6 space-y-6">
-          {form.fields.map((field) => (
-            <div key={field.id} className="space-y-1.5">
-              <label htmlFor={field.id} className="block text-sm font-semibold text-slate-700">
-                {language === 'mr' ? field.label_mr : field.label_en}
-                <span className="text-slate-400 font-normal ml-2 text-xs">
-                  ({language === 'mr' ? field.label_en : field.label_mr})
-                </span>
-                {field.is_required && <span className="text-red-500 ml-1 font-bold">*</span>}
-              </label>
-
-              {field.field_type === 'Number' && (
-                <input
-                  type="number"
-                  id={field.id}
-                  required={field.is_required}
-                  value={formData[field.id] !== undefined ? formData[field.id] : ''}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                />
-              )}
-
-              {field.field_type === 'Text' && (
-                <input
-                  type="text"
-                  id={field.id}
-                  required={field.is_required}
-                  value={formData[field.id] !== undefined ? formData[field.id] : ''}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  placeholder={language === 'mr' ? 'माहिती प्रविष्ट करा...' : 'Enter details...'}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                />
-              )}
-
-              {field.field_type === 'Date' && (
-                <input
-                  type="date"
-                  id={field.id}
-                  required={field.is_required}
-                  value={formData[field.id] !== undefined ? formData[field.id] : ''}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                />
-              )}
-
-              {field.field_type === 'Yes/No' && (
-                <div className="flex items-center gap-6 mt-1">
-                  <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                    <input
-                      type="radio"
-                      name={field.id}
-                      checked={formData[field.id] === 'yes'}
-                      onChange={() => handleInputChange(field.id, 'yes')}
-                      className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                    />
-                    <span>{language === 'mr' ? 'होय (Yes)' : 'Yes (होय)'}</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                    <input
-                      type="radio"
-                      name={field.id}
-                      checked={formData[field.id] === 'no'}
-                      onChange={() => handleInputChange(field.id, 'no')}
-                      className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                    />
-                    <span>{language === 'mr' ? 'नाही (No)' : 'No (नाही)'}</span>
-                  </label>
-                </div>
-              )}
-
-              {field.field_type === 'Dropdown' && (
-                <select
-                  id={field.id}
-                  required={field.is_required}
-                  value={formData[field.id] !== undefined ? formData[field.id] : ''}
-                  onChange={(e) => handleInputChange(field.id, e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">{language === 'mr' ? '-- निवडा --' : '-- Select --'}</option>
-                  {field.options?.map((opt) => (
-                    <option key={opt.id} value={opt.value}>
-                      {language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en}
-                    </option>
-                  ))}
-                </select>
-              )}
+          {form.fields.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-sm italic">
+              {language === 'mr' ? 'या अहवालासाठी कोणतेही प्रश्न / निर्देशक जोडलेले नाहीत.' : 'No fields configured for this form in database.'}
             </div>
-          ))}
+          ) : (
+            form.fields.map((field) => (
+              <div key={field.id} className="space-y-1.5">
+                <label htmlFor={field.id} className="block text-sm font-semibold text-slate-700">
+                  {language === 'mr' ? field.label_mr : field.label_en}
+                  <span className="text-slate-400 font-normal ml-2 text-xs">
+                    ({language === 'mr' ? field.label_en : field.label_mr})
+                  </span>
+                  {field.is_required && <span className="text-red-500 ml-1 font-bold">*</span>}
+                </label>
+
+                {field.field_type === 'Number' && (
+                  <input
+                    type="number"
+                    id={field.id}
+                    required={field.is_required}
+                    value={formData[field.id] !== undefined ? formData[field.id] : ''}
+                    onChange={(e) => handleInputChange(field.id, e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  />
+                )}
+
+                {field.field_type === 'Text' && (
+                  <input
+                    type="text"
+                    id={field.id}
+                    required={field.is_required}
+                    value={formData[field.id] !== undefined ? formData[field.id] : ''}
+                    onChange={(e) => handleInputChange(field.id, e.target.value)}
+                    placeholder={language === 'mr' ? 'माहिती प्रविष्ट करा...' : 'Enter details...'}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  />
+                )}
+
+                {field.field_type === 'Date' && (
+                  <input
+                    type="date"
+                    id={field.id}
+                    required={field.is_required}
+                    value={formData[field.id] !== undefined ? formData[field.id] : ''}
+                    onChange={(e) => handleInputChange(field.id, e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  />
+                )}
+
+                {field.field_type === 'Yes/No' && (
+                  <div className="flex items-center gap-6 mt-1">
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={field.id}
+                        checked={formData[field.id] === 'yes'}
+                        onChange={() => handleInputChange(field.id, 'yes')}
+                        className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                      />
+                      <span>{language === 'mr' ? 'होय (Yes)' : 'Yes (होय)'}</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={field.id}
+                        checked={formData[field.id] === 'no'}
+                        onChange={() => handleInputChange(field.id, 'no')}
+                        className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                      />
+                      <span>{language === 'mr' ? 'नाही (No)' : 'No (नाही)'}</span>
+                    </label>
+                  </div>
+                )}
+
+                {field.field_type === 'Dropdown' && (
+                  <select
+                    id={field.id}
+                    required={field.is_required}
+                    value={formData[field.id] !== undefined ? formData[field.id] : ''}
+                    onChange={(e) => handleInputChange(field.id, e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  >
+                    <option value="">{language === 'mr' ? '-- निवडा --' : '-- Select --'}</option>
+                    {field.options?.map((opt) => (
+                      <option key={opt.id} value={opt.value}>
+                        {language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -615,7 +570,7 @@ export default function ReportSubmission() {
             type="button"
             onClick={() => saveReport('Submitted')}
             disabled={submitting}
-            className="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-sm transition-colors"
+            className="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-xs transition-colors"
           >
             {isEditMode ? <Save className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
             {submitting 

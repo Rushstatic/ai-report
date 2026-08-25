@@ -14,7 +14,8 @@ import {
   Building2,
   Calendar,
   ChevronRight,
-  Edit
+  Edit,
+  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -22,13 +23,6 @@ import { exportToExcel } from '@/utils/excelExport';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
 import { useAuth } from '@/hooks/useAuth';
-
-const mockChartData = [
-  { name: 'Taluka A', submitted: 85, pending: 15 },
-  { name: 'Taluka B', submitted: 65, pending: 35 },
-  { name: 'Taluka C', submitted: 92, pending: 8 },
-  { name: 'Taluka D', submitted: 45, pending: 55 },
-];
 
 export default function Dashboard() {
   const { language } = useLanguageStore();
@@ -44,7 +38,16 @@ export default function Dashboard() {
     phcs: 0,
     subcentres: 0,
     employees: 0,
+    expectedReports: 0,
+    submittedReports: 0,
+    complianceRate: 0,
+    pendingReports: 0,
   });
+
+  const [talukaOptions, setTalukaOptions] = useState<any[]>([]);
+  const [selectedTalukaId, setSelectedTalukaId] = useState<string>('ALL');
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [pendingList, setPendingList] = useState<any[]>([]);
 
   // Employee Sub-centre specific stats
   const [subcentreVillagesCount, setSubcentreVillagesCount] = useState(0);
@@ -58,11 +61,17 @@ export default function Dashboard() {
       setLoading(true);
       try {
         if (isController) {
+          // 1. Fetch live Talukas for dropdown
+          const { data: talukaList } = await supabase.from('talukas').select('id, name').order('name');
+          if (talukaList) setTalukaOptions(talukaList);
+
+          // 2. Base queries for counts
           let talQuery = supabase.from('talukas').select('*', { count: 'exact', head: true });
           let phcQuery = supabase.from('phcs').select('*', { count: 'exact', head: true });
           let scQuery = supabase.from('sub_centres').select('*', { count: 'exact', head: true });
-          let empQuery = supabase.from('employees').select('*', { count: 'exact', head: true });
+          let empQuery = supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', true);
 
+          // Scoping by controller hierarchy
           if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
             talQuery = talQuery.eq('id', employee.taluka_id);
             phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
@@ -78,21 +87,101 @@ export default function Dashboard() {
             phcQuery = phcQuery.eq('id', employee.phc_id);
             scQuery = scQuery.eq('phc_id', employee.phc_id);
             empQuery = empQuery.eq('phc_id', employee.phc_id);
+          } else if (selectedTalukaId !== 'ALL') {
+            phcQuery = phcQuery.eq('taluka_id', selectedTalukaId);
+            empQuery = empQuery.eq('taluka_id', selectedTalukaId);
+            const phcList = await (supabase.from('phcs') as any).select('id').eq('taluka_id', selectedTalukaId);
+            const phcIds = phcList.data?.map((p: any) => p.id) || [];
+            if (phcIds.length > 0) {
+              scQuery = scQuery.in('phc_id', phcIds);
+            }
           }
 
-          const [talukas, phcs, subcentres, employees_count] = await Promise.all([
+          const [talukasRes, phcsRes, subcentresRes, employeesRes] = await Promise.all([
             talQuery,
             phcQuery,
             scQuery,
             empQuery,
           ]);
 
+          // 3. Fetch live Submissions
+          let subQuery = supabase.from('report_submissions').select(`
+            id,
+            form_id,
+            employee_id,
+            status,
+            period_start,
+            submitted_at,
+            due_date,
+            created_at,
+            forms (name, reporting_period),
+            employees!inner (
+              name,
+              employee_type,
+              taluka_id,
+              phc_id,
+              sub_centre_id,
+              talukas (name),
+              phcs (name),
+              sub_centres (name)
+            )
+          `);
+
+          if (employee?.employee_type === 'TALUKA_CONTROLLER' && employee.taluka_id) {
+            subQuery = subQuery.eq('employees.taluka_id', employee.taluka_id);
+          } else if (employee?.employee_type === 'PHC_CONTROLLER' && employee.phc_id) {
+            subQuery = subQuery.eq('employees.phc_id', employee.phc_id);
+          } else if (selectedTalukaId !== 'ALL') {
+            subQuery = subQuery.eq('employees.taluka_id', selectedTalukaId);
+          }
+
+          const { data: allSubmissions } = await subQuery;
+          const subs = allSubmissions || [];
+
+          // 4. Calculate live metrics
+          const submittedCount = subs.filter(s => s.status === 'Submitted' || s.status === 'Approved').length;
+          const pendingSubs = subs.filter(s => s.status === 'Pending' || s.status === 'Overdue' || s.status === 'Draft');
+          
+          // Total active workers & active forms
+          const totalStaff = employeesRes.count || 0;
+          const { count: formsCount } = await supabase.from('forms').select('*', { count: 'exact', head: true }).or('active.is.null,active.eq.true');
+          const activeFormsNum = formsCount || 1;
+          
+          // Expected is minimum of total submitted+pending or activeStaff * activeForms
+          const expected = Math.max(subs.length, totalStaff > 0 ? totalStaff * Math.min(activeFormsNum, 3) : 0);
+          const compliance = expected > 0 ? Math.min(100, Math.round((submittedCount / expected) * 100)) : (submittedCount > 0 ? 100 : 0);
+
           setStats({
-            talukas: talukas.count || 3,
-            phcs: phcs.count || 12,
-            subcentres: subcentres.count || 48,
-            employees: employees_count.count || 145,
+            talukas: talukasRes.count || 0,
+            phcs: phcsRes.count || 0,
+            subcentres: subcentresRes.count || 0,
+            employees: employeesRes.count || 0,
+            expectedReports: expected,
+            submittedReports: submittedCount,
+            complianceRate: compliance,
+            pendingReports: pendingSubs.length,
           });
+
+          // 5. Calculate live chart data grouped by Taluka or PHC
+          if (talukaList && talukaList.length > 0) {
+            const chartDataCalculated = talukaList.map((tal: any) => {
+              const talSubs = subs.filter((s: any) => s.employees?.taluka_id === tal.id);
+              const submitted = talSubs.filter((s: any) => s.status === 'Submitted' || s.status === 'Approved').length;
+              const pending = talSubs.filter((s: any) => s.status === 'Pending' || s.status === 'Overdue' || s.status === 'Draft').length;
+              return {
+                name: tal.name,
+                submitted: submitted,
+                pending: pending,
+              };
+            });
+            setChartData(chartDataCalculated);
+          } else {
+            setChartData([]);
+          }
+
+          // 6. Set pending/overdue records
+          setPendingList(pendingSubs.slice(0, 10));
+
         } else {
           // Employee / Sub-centre level data
           if (employee?.sub_centre_id) {
@@ -101,14 +190,14 @@ export default function Dashboard() {
               .from('villages')
               .select('*', { count: 'exact', head: true })
               .eq('sub_centre_id', employee.sub_centre_id);
-            setSubcentreVillagesCount(vCount || 4);
+            setSubcentreVillagesCount(vCount || 0);
 
             // 2. Fetch staff in this sub-centre
             const { count: sCount } = await supabase
               .from('employees')
               .select('*', { count: 'exact', head: true })
               .eq('sub_centre_id', employee.sub_centre_id);
-            setSubcentreStaffCount(sCount || 3);
+            setSubcentreStaffCount(sCount || 0);
 
             // 3. Fetch submissions from this sub-centre
             const { data: subs } = await supabase
@@ -127,12 +216,12 @@ export default function Dashboard() {
               .order('submitted_at', { ascending: false })
               .limit(5);
 
-            if (subs && subs.length > 0) {
+            if (subs) {
               setRecentSubmissions(subs);
             }
           }
 
-          // 4. Fetch Available forms assigned to this employee's role (or ALL)
+          // 4. Fetch Available forms assigned to this employee's role (or ALL) directly from DB
           const empRole = (employee?.employee_type || 'MPW').toUpperCase();
           const { data: formsData } = await (supabase
             .from('forms') as any)
@@ -151,22 +240,7 @@ export default function Dashboard() {
             });
           }
 
-          if (matchedForms.length > 0) {
-            setAssignedForms(matchedForms);
-          } else {
-            // Standard health worker role-specific forms
-            const defaultRoleForms: any[] = [
-              { id: 'f-monthly-sc', name: 'Monthly Sub-centre Composite Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ALL' },
-              { id: 'f-malaria-mpw', name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप अहवाल)', reporting_period: 'Weekly', report_type: 'VILLAGE_PROGRESS', target_role: 'MPW' },
-              { id: 'f-water-mpw', name: 'Drinking Water Quality & Chlorination Log (पिण्याचे पाणी तपासणी)', reporting_period: 'Weekly', report_type: 'VILLAGE_PROGRESS', target_role: 'MPW' },
-              { id: 'f-rch-anm', name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ANM' },
-              { id: 'f-immunization-anm', name: 'Routine Immunization Coverage Report (नियमित लसीकरण अहवाल)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'ANM' },
-              { id: 'f-ncd-cho', name: 'HWC NCD Screening & Teleconsultation Progress (NCD तपासणी व टेलीमेडिसिन)', reporting_period: 'Monthly', report_type: 'VILLAGE_NUMERICAL', target_role: 'CHO' },
-              { id: 'f-wellness-cho', name: 'HWC Wellness Activities & Yoga Sessions (आरोग्य वर्धिनी वेलनेस नोंद)', reporting_period: 'Monthly', report_type: 'SUBCENTRE_LEVEL', target_role: 'CHO' },
-            ];
-
-            setAssignedForms(defaultRoleForms.filter(f => f.target_role === 'ALL' || f.target_role === empRole));
-          }
+          setAssignedForms(matchedForms);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -176,32 +250,46 @@ export default function Dashboard() {
     }
 
     fetchData();
-  }, [employee, isController]);
+  }, [employee, isController, selectedTalukaId]);
 
   const handleExportCompliance = () => {
-    exportToExcel(mockChartData, {
+    const exportRows = chartData.map(item => ({
+      'Taluka': item.name,
+      'Submitted Reports': item.submitted,
+      'Pending Reports': item.pending,
+      'Total Reports': item.submitted + item.pending,
+      'Compliance %': item.submitted + item.pending > 0 
+        ? Math.round((item.submitted / (item.submitted + item.pending)) * 100) + '%'
+        : '0%'
+    }));
+
+    exportToExcel(exportRows.length > 0 ? exportRows : [{ 'Notice': 'No submission data found' }], {
       filename: 'Taluka_Compliance_Report',
-      districtName: 'Latur District',
-      talukaName: 'All Talukas',
-      reportName: 'Submission Compliance Report',
-      period: 'August 2026',
+      districtName: 'District Health Office',
+      talukaName: selectedTalukaId === 'ALL' ? 'All Talukas' : talukaOptions.find(t => t.id === selectedTalukaId)?.name || 'Taluka',
+      reportName: 'Live Submission Compliance Report',
+      period: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     });
   };
 
   const handleExportPending = () => {
-    const pendingData = [1, 2, 3, 4, 5].map((i) => ({
-      'PHC / Sub-Centre': `Bhada / SC ${i}`,
-      'Employee': 'MPW Employee',
-      'Days Overdue': i * 2,
-      'Report Type': 'Monthly TB Surveillance',
+    const exportRows = pendingList.map((item, idx) => ({
+      'Sr. No.': idx + 1,
+      'Facility / Sub-Centre': item.employees?.sub_centres?.name || item.employees?.phcs?.name || 'N/A',
+      'Employee Name': item.employees?.name || 'N/A',
+      'Role': item.employees?.employee_type || 'N/A',
+      'Report Type': item.forms?.name || 'N/A',
+      'Reporting Period': item.forms?.reporting_period || 'N/A',
+      'Status': item.status || 'Pending',
+      'Due / Submitted Date': item.due_date || item.submitted_at || 'Pending',
     }));
 
-    exportToExcel(pendingData, {
+    exportToExcel(exportRows.length > 0 ? exportRows : [{ 'Notice': 'No pending reports recorded' }], {
       filename: 'Pending_Reports_List',
-      districtName: 'Latur District',
-      talukaName: 'All Talukas',
-      reportName: 'Critical Pending Reports',
-      period: 'August 2026',
+      districtName: 'District Health Office',
+      talukaName: selectedTalukaId === 'ALL' ? 'All Talukas' : talukaOptions.find(t => t.id === selectedTalukaId)?.name || 'Taluka',
+      reportName: 'Live Critical Pending & Overdue Reports',
+      period: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     });
   };
 
@@ -231,11 +319,11 @@ export default function Dashboard() {
           </div>
 
           <button
-            onClick={() => navigate('/reports/my')}
+            onClick={() => navigate('/reports/entry')}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-xs"
           >
             <PlusCircle className="w-4 h-4" />
-            {language === 'mr' ? 'नवीन अहवाल सादर करा' : 'Submit New Report'}
+            {language === 'mr' ? 'नवीन अहवाल भरा' : 'Fill New Report'}
           </button>
         </div>
 
@@ -248,7 +336,7 @@ export default function Dashboard() {
               </p>
               <MapPin className="w-5 h-5 text-emerald-600" />
             </div>
-            <p className="text-2xl font-bold text-slate-800 mt-2">{subcentreVillagesCount || 4} गावे</p>
+            <p className="text-2xl font-bold text-slate-800 mt-2">{subcentreVillagesCount} गावे</p>
             <div className="mt-2 text-[10px] text-slate-500">
               {subcentreName} कार्यक्षेत्र
             </div>
@@ -261,7 +349,7 @@ export default function Dashboard() {
               </p>
               <Users className="w-5 h-5 text-blue-600" />
             </div>
-            <p className="text-2xl font-bold text-slate-800 mt-2">{subcentreStaffCount || 3} कार्यरत</p>
+            <p className="text-2xl font-bold text-slate-800 mt-2">{subcentreStaffCount} कार्यरत</p>
             <div className="mt-2 text-[10px] text-slate-500">
               MPW, ANM, CHO
             </div>
@@ -287,7 +375,7 @@ export default function Dashboard() {
               </p>
               <CheckCircle className="w-5 h-5 text-emerald-600" />
             </div>
-            <p className="text-2xl font-bold text-emerald-700 mt-2">{recentSubmissions.length || 3}</p>
+            <p className="text-2xl font-bold text-emerald-700 mt-2">{recentSubmissions.length}</p>
             <div className="mt-2 text-[10px] text-emerald-600 font-medium">
               {subcentreName} कडून सादर
             </div>
@@ -312,33 +400,41 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div className="p-4 divide-y divide-slate-100">
-              {assignedForms.map((form) => (
-                <div key={form.id} className="py-3 flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg transition-colors">
-                  <div>
-                    <h4 className="font-semibold text-slate-800 text-sm">{form.name}</h4>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                      <span className="inline-flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
-                        {form.reporting_period || 'Monthly'}
-                      </span>
-                      {form.target_role && (
-                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-semibold">
-                          Role: {form.target_role}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => navigate(`/reports/submit/${form.id}`)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    {language === 'mr' ? 'अहवाल भरा' : 'Fill Report'}
-                  </button>
+            <div className="p-4 flex-1">
+              {assignedForms.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs italic">
+                  {language === 'mr' ? 'कोणतेही अहवाल उपलब्ध नाहीत.' : 'No active forms found in database.'}
                 </div>
-              ))}
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {assignedForms.map((form) => (
+                    <div key={form.id} className="py-3 flex items-center justify-between hover:bg-slate-50 p-2 rounded-lg transition-colors">
+                      <div>
+                        <h4 className="font-semibold text-slate-800 text-sm">{form.name}</h4>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                          <span className="inline-flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            {form.reporting_period || 'Monthly'}
+                          </span>
+                          {form.target_role && (
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-semibold">
+                              Role: {form.target_role}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => navigate(`/reports/submit/${form.id}`)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        {language === 'mr' ? 'अहवाल भरा' : 'Fill Report'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -411,20 +507,33 @@ export default function Dashboard() {
   // CONTROLLER DASHBOARD VIEW (District, Taluka, PHC)
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
-        <div className="flex gap-2">
-          <select className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-            <option>All Talukas</option>
-            <option>Taluka A</option>
-            <option>Taluka B</option>
-          </select>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
+          <p className="text-xs text-gray-500 mt-1">Live synchronized health statistics and compliance monitoring.</p>
         </div>
+        
+        {talukaOptions.length > 0 && employee?.employee_type === 'DISTRICT_CONTROLLER' && (
+          <div className="flex gap-2">
+            <select 
+              value={selectedTalukaId}
+              onChange={(e) => setSelectedTalukaId(e.target.value)}
+              className="block w-48 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white shadow-xs"
+            >
+              <option value="ALL">All Talukas ({talukaOptions.length})</option>
+              {talukaOptions.map((tal) => (
+                <option key={tal.id} value={tal.id}>
+                  {tal.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.totalFacilities')}</p>
           <p className="text-3xl font-bold text-slate-800 mt-1">{stats.phcs} / {stats.subcentres}</p>
           <div className="mt-2 flex items-center gap-2">
@@ -432,7 +541,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.totalEmployees')}</p>
           <p className="text-3xl font-bold text-slate-800 mt-1">{stats.employees}</p>
           <div className="mt-2 flex items-center gap-2">
@@ -440,19 +549,19 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.expectedReports')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">1,240</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.expectedReports.toLocaleString()}</p>
           <div className="mt-2 flex items-center gap-2">
             <span className="text-[10px] px-2 py-0.5 bg-slate-100 rounded text-slate-500 font-medium">{t('dash.currentMonth')}</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider text-emerald-600">{t('dash.submitted')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">892</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.submittedReports.toLocaleString()}</p>
           <div className="mt-2 flex items-center gap-2 text-emerald-600">
-            <span className="text-xs font-bold">72%</span>
+            <span className="text-xs font-bold">{stats.complianceRate}%</span>
             <span className="text-[10px] text-slate-400">{t('dash.compliance')}</span>
           </div>
         </div>
@@ -460,7 +569,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Chart */}
-        <div className="col-span-1 lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+        <div className="col-span-1 lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-slate-800">{t('dash.chartTitle')}</h3>
             <button 
@@ -472,46 +581,64 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
-                <Bar dataKey="submitted" stackId="a" fill="#3b82f6" radius={[0, 0, 4, 4]} />
-                <Bar dataKey="pending" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {chartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                No Taluka submission records found.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="submitted" name="Submitted" stackId="a" fill="#3b82f6" radius={[0, 0, 4, 4]} />
+                  <Bar dataKey="pending" name="Pending" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
         {/* Pending Reports List */}
-        <div className="col-span-1 lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        <div className="col-span-1 lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
             <h3 className="font-bold text-slate-800 text-sm">{t('dash.whoNotSubmitted')}</h3>
             <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
-              342 {t('dash.critical')}
+              {stats.pendingReports} {t('dash.critical')}
             </span>
           </div>
-          <div className="flex-1 overflow-auto">
-            <table className="w-full text-left">
-              <thead className="sticky top-0 bg-white border-b border-slate-100">
-                <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                  <th className="px-4 py-3">{t('dash.colPhc')}</th>
-                  <th className="px-4 py-3">{t('dash.colEmployee')}</th>
-                  <th className="px-4 py-3">{t('dash.colDays')}</th>
-                </tr>
-              </thead>
-              <tbody className="text-xs">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">Bhada / SC {i}</td>
-                    <td className="px-4 py-3 text-slate-500">MPW Employee</td>
-                    <td className="px-4 py-3 text-rose-600 font-bold">{i * 2}d</td>
+          <div className="flex-1 overflow-auto max-h-[300px]">
+            {pendingList.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs italic">
+                No overdue or pending submissions recorded.
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="sticky top-0 bg-white border-b border-slate-100">
+                  <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    <th className="px-4 py-3">{t('dash.colPhc')}</th>
+                    <th className="px-4 py-3">{t('dash.colEmployee')}</th>
+                    <th className="px-4 py-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-xs">
+                  {pendingList.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {item.employees?.sub_centres?.name || item.employees?.phcs?.name || 'Sub-centre'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {item.employees?.name || 'Staff'} ({item.employees?.employee_type || 'MPW'})
+                      </td>
+                      <td className="px-4 py-3 text-rose-600 font-bold">
+                        {item.status || 'Pending'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           <div className="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
             <button 
@@ -521,7 +648,10 @@ export default function Dashboard() {
               <Download className="h-4 w-4" />
               Export
             </button>
-            <button className="flex-[2] py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700">
+            <button 
+              onClick={() => navigate('/reports/pending')}
+              className="flex-[2] py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700"
+            >
               {t('dash.viewAllPending')}
             </button>
           </div>

@@ -2,32 +2,32 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FileText, 
-  Send, 
   Calendar, 
+  Search, 
+  Filter, 
+  Send, 
   CheckCircle2, 
   Clock, 
-  AlertCircle, 
-  Building2, 
   MapPin, 
-  UserCheck, 
-  Search,
-  Filter,
-  ArrowRight,
+  Building2, 
+  UserCheck,
+  AlertCircle,
+  RefreshCw,
   Sparkles
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
+import { syncStandardFormsToDatabase } from '@/utils/syncForms';
 
 interface FormItem {
   id: string;
   name: string;
   code?: string;
-  reporting_period?: string;
-  report_type?: string;
+  description: string;
+  reporting_period: string;
+  report_type: string;
   target_role?: string;
-  version?: number;
-  description?: string;
 }
 
 export default function DataEntryList() {
@@ -39,134 +39,72 @@ export default function DataEntryList() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [periodFilter, setPeriodFilter] = useState('ALL');
+  const [periodFilter, setPeriodFilter] = useState<string>('ALL');
+  const [syncing, setSyncing] = useState(false);
 
   const empRole = (employee?.employee_type || 'MPW').toUpperCase();
   const subcentreName = (employee as any)?.sub_centres?.name || 'Sub-centre';
   const phcName = (employee as any)?.phcs?.name || 'PHC';
 
-  useEffect(() => {
-    async function loadFormsAndSubmissions() {
-      setLoading(true);
-      try {
-        // 1. Fetch all active forms from database
-        const { data: dbForms, error: formsErr } = await (supabase
-          .from('forms') as any)
-          .select('*')
-          .or('active.is.null,active.eq.true')
-          .order('name');
+  const loadFormsAndSubmissions = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch live active forms from Supabase
+      const { data: formsData } = await (supabase
+        .from('forms') as any)
+        .select('*')
+        .or('active.is.null,active.eq.true')
+        .order('name');
 
-        let loadedForms: FormItem[] = [];
+      let loadedForms: FormItem[] = [];
 
-        if (!formsErr && dbForms && dbForms.length > 0) {
-          // Filter forms relevant to this employee's role (or ALL)
-          loadedForms = dbForms.filter((f: any) => {
-            if (!f.target_role || f.target_role === 'ALL' || f.target_role === '' || f.target_role === 'All') {
-              return true;
-            }
-            const roles = f.target_role.toUpperCase().split(/[,/| ]+/).map((r: string) => r.trim());
-            return roles.includes('ALL') || roles.includes(empRole);
-          });
-        }
-
-        // If no forms matched in DB, provide comprehensive standard public health forms
-        if (loadedForms.length === 0) {
-          const standardForms: FormItem[] = [
-            { 
-              id: 'f-monthly-sc', 
-              name: 'Monthly Sub-centre Composite Report (मासिक उपकेंद्र सर्वसमावेशक अहवाल)', 
-              reporting_period: 'Monthly', 
-              report_type: 'VILLAGE_NUMERICAL', 
-              target_role: 'ALL',
-              description: 'Routine general monthly morbidity, maternal, and immunization coverage data.'
-            },
-            { 
-              id: 'f-malaria-mpw', 
-              name: 'Weekly Vector Borne Disease & Malaria Surveillance (हिवताप व किटकजन्य रोग साप्ताहिक अहवाल)', 
-              reporting_period: 'Weekly', 
-              report_type: 'VILLAGE_PROGRESS', 
-              target_role: 'MPW',
-              description: 'BSER, fever cases, slide collection, and vector control field logs.'
-            },
-            { 
-              id: 'f-water-mpw', 
-              name: 'Drinking Water Quality & TCL Testing Log (पिण्याचे पाणी व टीसीएल क्लोरीनेशन नोंद)', 
-              reporting_period: 'Weekly', 
-              report_type: 'VILLAGE_PROGRESS', 
-              target_role: 'MPW',
-              description: 'OT test, chlorination levels in village water tanks, and sanitary survey.'
-            },
-            { 
-              id: 'f-rch-anm', 
-              name: 'Maternal & Child Health Progress - RCH (माता व बाल संगोपन मासिक प्रगती अहवाल)', 
-              reporting_period: 'Monthly', 
-              report_type: 'VILLAGE_NUMERICAL', 
-              target_role: 'ANM',
-              description: 'ANC 1st trimester, high-risk pregnancies, institutional deliveries, and PNC.'
-            },
-            { 
-              id: 'f-immunization-anm', 
-              name: 'Routine Immunization & Session Site Report (नियमित लसीकरण व सत्र अहवाल)', 
-              reporting_period: 'Monthly', 
-              report_type: 'VILLAGE_NUMERICAL', 
-              target_role: 'ANM',
-              description: 'Infant vaccines (BCG, Penta, MR), dropout tracking, and RI session performance.'
-            },
-            { 
-              id: 'f-ncd-cho', 
-              name: 'HWC NCD Screening & Teleconsultation Log (NCD असंसर्गजन्य रोग तपासणी व टेलीमेडिसिन)', 
-              reporting_period: 'Monthly', 
-              report_type: 'VILLAGE_NUMERICAL', 
-              target_role: 'CHO',
-              description: 'Hypertension, Diabetes, Cancer screening (30+ pop) and e-Sanjeevani teleconsults.'
-            },
-            { 
-              id: 'f-wellness-cho', 
-              name: 'HWC Wellness Activities & Community Health Day (आरोग्य वर्धिनी वेलनेस व योग सत्र)', 
-              reporting_period: 'Monthly', 
-              report_type: 'SUBCENTRE_LEVEL', 
-              target_role: 'CHO',
-              description: 'Yoga sessions, VHSNC meetings, adolescent health days, and wellness log.'
-            },
-            { 
-              id: 'f-tb-surv', 
-              name: 'TB Active Case Finding & Suspect Referral (क्षयरोग संशयित शोध व संदर्भ सेवा)', 
-              reporting_period: 'Monthly', 
-              report_type: 'VILLAGE_NUMERICAL', 
-              target_role: 'ALL',
-              description: 'Presumptive TB identification, sputum sample collection, and Nikshay linkage.'
-            }
-          ];
-
-          loadedForms = standardForms.filter(f => {
-            if (f.target_role === 'ALL') return true;
-            return f.target_role === empRole;
-          });
-        }
-
-        setForms(loadedForms);
-
-        // 2. Fetch recent submissions for this sub-centre to indicate status
-        if (employee?.sub_centre_id) {
-          const { data: subData } = await (supabase
-            .from('report_submissions') as any)
-            .select('id, form_id, period_start, period_end, status, submitted_at, employee_id')
-            .eq('sub_centre_id', employee.sub_centre_id)
-            .order('submitted_at', { ascending: false });
-
-          if (subData) {
-            setSubmissions(subData);
+      if (formsData && formsData.length > 0) {
+        // Filter by role match or 'ALL'
+        loadedForms = formsData.filter((f: any) => {
+          if (!f.target_role || f.target_role === 'ALL' || f.target_role === '' || f.target_role === 'All') {
+            return true;
           }
-        }
-      } catch (err) {
-        console.error("Error loading forms:", err);
-      } finally {
-        setLoading(false);
+          const roles = f.target_role.toUpperCase().split(/[,/| ]+/).map((r: string) => r.trim());
+          return roles.includes('ALL') || roles.includes(empRole);
+        });
       }
-    }
 
+      setForms(loadedForms);
+
+      // 2. Fetch recent submissions for this sub-centre to indicate status
+      if (employee?.sub_centre_id) {
+        const { data: subData } = await (supabase
+          .from('report_submissions') as any)
+          .select('id, form_id, period_start, period_end, status, submitted_at, employee_id')
+          .eq('sub_centre_id', employee.sub_centre_id)
+          .order('submitted_at', { ascending: false });
+
+        if (subData) {
+          setSubmissions(subData);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading forms:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadFormsAndSubmissions();
   }, [employee, empRole]);
+
+  const handleSyncForms = async () => {
+    setSyncing(true);
+    try {
+      await syncStandardFormsToDatabase();
+      await loadFormsAndSubmissions();
+    } catch (err) {
+      console.error('Failed to sync forms:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const filteredForms = forms.filter(form => {
     const matchesSearch = form.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -267,13 +205,27 @@ export default function DataEntryList() {
       {loading ? (
         <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-3" />
-          <p>{language === 'mr' ? 'अहवाल लोड होत आहेत...' : 'Loading available forms for your role...'}</p>
+          <p>{language === 'mr' ? 'अहवाल लोड होत आहेत...' : 'Loading live forms for your role...'}</p>
         </div>
       ) : filteredForms.length === 0 ? (
-        <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500">
-          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+        <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500 flex flex-col items-center">
+          <FileText className="w-12 h-12 text-slate-300 mb-3" />
           <p className="font-semibold text-slate-700">{language === 'mr' ? 'कोणतेही अहवाल सापडले नाहीत' : 'No forms found'}</p>
-          <p className="text-xs text-slate-400 mt-1">{language === 'mr' ? 'कृपया शोध निकष तपासा.' : 'Try adjusting your search or filter criteria.'}</p>
+          <p className="text-xs text-slate-400 mt-1 max-w-md">
+            {language === 'mr' 
+              ? 'डेटाबेसमध्ये सध्या आपल्या पदासाठी लागू असलेले अहवाल आढळले नाहीत.' 
+              : 'No active reporting forms are currently registered in the database for your role.'}
+          </p>
+          <button
+            onClick={handleSyncForms}
+            disabled={syncing}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing 
+              ? (language === 'mr' ? 'सिंक होत आहे...' : 'Syncing Live Forms...') 
+              : (language === 'mr' ? 'प्रमाणित आरोग्य अहवाल सिंक करा' : 'Sync Standard Health Forms to Database')}
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
