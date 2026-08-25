@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Settings, Eye, Save } from 'lucide-react';
+import { Plus, Trash2, Settings, Eye, Save, GripVertical } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 // Helper types matching the DB enums
@@ -7,12 +7,20 @@ type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
 type ReportPeriod = 'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly';
 type ReportType = 'VILLAGE_NUMERICAL' | 'LIST' | 'SUBCENTRE_LEVEL';
 
+interface FormFieldOption {
+  id: string;
+  labelEn: string;
+  labelMr: string;
+  value: string;
+}
+
 interface FormField {
   id: string;
   labelEn: string;
   labelMr: string;
   type: FieldType;
   required: boolean;
+  options?: FormFieldOption[];
 }
 
 export default function FormBuilder() {
@@ -28,7 +36,8 @@ export default function FormBuilder() {
       labelEn: '', 
       labelMr: '', 
       type: 'Text', 
-      required: false 
+      required: false,
+      options: []
     }]);
   };
 
@@ -38,6 +47,42 @@ export default function FormBuilder() {
 
   const removeField = (id: string) => {
     setFields(fields.filter(f => f.id !== id));
+  };
+
+  const addOption = (fieldId: string) => {
+    setFields(fields.map(f => {
+      if (f.id === fieldId) {
+        return {
+          ...f,
+          options: [...(f.options || []), { id: crypto.randomUUID(), labelEn: '', labelMr: '', value: '' }]
+        };
+      }
+      return f;
+    }));
+  };
+
+  const updateOption = (fieldId: string, optionId: string, updates: Partial<FormFieldOption>) => {
+    setFields(fields.map(f => {
+      if (f.id === fieldId) {
+        return {
+          ...f,
+          options: f.options?.map(opt => opt.id === optionId ? { ...opt, ...updates } : opt)
+        };
+      }
+      return f;
+    }));
+  };
+
+  const removeOption = (fieldId: string, optionId: string) => {
+    setFields(fields.map(f => {
+      if (f.id === fieldId) {
+        return {
+          ...f,
+          options: f.options?.filter(opt => opt.id !== optionId)
+        };
+      }
+      return f;
+    }));
   };
 
   const handleSave = async () => {
@@ -78,15 +123,41 @@ export default function FormBuilder() {
           display_order: index,
         }));
 
-        const { error: fieldsError } = await supabase
+        const { data: insertedFields, error: fieldsError } = await supabase
           .from('form_fields')
-          .insert(fieldsToInsert);
+          .insert(fieldsToInsert)
+          .select();
 
         if (fieldsError) throw fieldsError;
+
+        // Insert options for dropdowns
+        const optionsToInsert = fields.flatMap((f, i) => {
+          if (f.type === 'Dropdown' && f.options && f.options.length > 0) {
+            const dbField = insertedFields[i];
+            return f.options.map((opt, optIndex) => ({
+              field_id: dbField.id,
+              label_en: opt.labelEn,
+              label_mr: opt.labelMr,
+              value: opt.value || opt.labelEn.toLowerCase().replace(/\s+/g, '_'),
+              display_order: optIndex,
+            }));
+          }
+          return [];
+        });
+
+        if (optionsToInsert.length > 0) {
+          const { error: optionsError } = await supabase
+            .from('form_field_options')
+            .insert(optionsToInsert);
+          
+          if (optionsError) throw optionsError;
+        }
       }
 
       alert('Form saved successfully!');
-      // Reset form or navigate
+      // Reset form
+      setFormName('');
+      setFields([]);
     } catch (error) {
       console.error('Error saving form:', error);
       alert('Failed to save form. (Note: Requires Supabase setup to be complete)');
@@ -106,7 +177,7 @@ export default function FormBuilder() {
           </button>
           <button 
             onClick={handleSave}
-            disabled={isSaving || !formName}
+            disabled={isSaving || !formName || fields.length === 0}
             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
             <Save className="mr-2 h-4 w-4" />
@@ -236,8 +307,65 @@ export default function FormBuilder() {
                         <option value="Number">Number</option>
                         <option value="Yes/No">Yes/No</option>
                         <option value="Date">Date</option>
+                        <option value="Dropdown">Dropdown</option>
                       </select>
                     </div>
+                    
+                    {field.type === 'Dropdown' && (
+                      <div className="sm:col-span-12 mt-2 p-4 bg-white rounded-md border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-700">Dropdown Options</h4>
+                          <button
+                            type="button"
+                            onClick={() => addOption(field.id)}
+                            className="inline-flex items-center text-xs font-medium text-blue-600 hover:text-blue-500"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Option
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {field.options?.map((option, optIdx) => (
+                            <div key={option.id} className="flex items-center gap-2">
+                              <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
+                              <span className="text-xs text-gray-500 w-4">{optIdx + 1}.</span>
+                              <input
+                                type="text"
+                                placeholder="Option EN"
+                                value={option.labelEn}
+                                onChange={(e) => updateOption(field.id, option.id, { labelEn: e.target.value })}
+                                className="flex-1 min-w-0 sm:text-sm border-gray-300 rounded-md py-1 px-2 border focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Option MR"
+                                value={option.labelMr}
+                                onChange={(e) => updateOption(field.id, option.id, { labelMr: e.target.value })}
+                                className="flex-1 min-w-0 sm:text-sm border-gray-300 rounded-md py-1 px-2 border focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Value (optional)"
+                                value={option.value}
+                                onChange={(e) => updateOption(field.id, option.id, { value: e.target.value })}
+                                className="flex-1 min-w-0 sm:text-sm border-gray-300 rounded-md py-1 px-2 border focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeOption(field.id, option.id)}
+                                className="text-gray-400 hover:text-red-500 p-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                          {(!field.options || field.options.length === 0) && (
+                            <p className="text-xs text-gray-500 italic">No options added yet. Add at least one option.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="sm:col-span-12 flex items-center mt-2">
                       <input
                         id={`required-${field.id}`}
@@ -268,3 +396,4 @@ export default function FormBuilder() {
     </div>
   );
 }
+
