@@ -377,11 +377,33 @@ export default function ReportSubmission() {
 
       {/* Alerts */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-3 flex-shrink-0" />
-            <p className="text-sm text-red-700 font-medium">{error}</p>
+        <div id="report-submission-error-alert" className="bg-red-50/95 border-2 border-red-200 rounded-xl p-4 sm:p-5 flex items-start justify-between shadow-sm transition-all animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-red-100 border border-red-200 text-red-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider bg-red-600 text-white px-2 py-0.5 rounded">
+                  {language === 'mr' ? 'त्रुटी (Error)' : 'Submission Error'}
+                </span>
+                <p className="text-sm font-bold text-red-900">
+                  {language === 'mr' ? 'अहवाल सादर करताना अडचण आली' : 'Unable to submit report'}
+                </p>
+              </div>
+              <p className="text-xs font-medium text-red-700 mt-1.5 leading-relaxed bg-red-100/50 p-2 rounded-md border border-red-200/60">
+                {error}
+              </p>
+            </div>
           </div>
+          <button 
+            type="button"
+            onClick={() => setError(null)} 
+            className="text-red-400 hover:text-red-700 hover:bg-red-100 p-1.5 rounded-lg text-sm font-bold transition-colors"
+            title="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
 
