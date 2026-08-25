@@ -46,13 +46,13 @@ export default function HierarchyManager() {
         talQuery = talQuery.eq('id', employee.taluka_id);
         phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
         
-        const phcList = await supabase.from('phcs').select('id').eq('taluka_id', employee.taluka_id);
-        const phcIds = phcList.data?.map(p => p.id) || [];
+        const phcList = await (supabase.from('phcs') as any).select('id').eq('taluka_id', employee.taluka_id);
+        const phcIds = phcList.data?.map((p: any) => p.id) || [];
         if (phcIds.length > 0) {
           scQuery = scQuery.in('phc_id', phcIds);
           
-          const scList = await supabase.from('sub_centres').select('id').in('phc_id', phcIds);
-          const scIds = scList.data?.map(s => s.id) || [];
+          const scList = await (supabase.from('sub_centres') as any).select('id').in('phc_id', phcIds);
+          const scIds = scList.data?.map((s: any) => s.id) || [];
           if (scIds.length > 0) {
             vilQuery = vilQuery.in('sub_centre_id', scIds);
           } else {
@@ -67,8 +67,8 @@ export default function HierarchyManager() {
         phcQuery = phcQuery.eq('id', employee.phc_id);
         scQuery = scQuery.eq('phc_id', employee.phc_id);
         
-        const scList = await supabase.from('sub_centres').select('id').eq('phc_id', employee.phc_id);
-        const scIds = scList.data?.map(s => s.id) || [];
+        const scList = await (supabase.from('sub_centres') as any).select('id').eq('phc_id', employee.phc_id);
+        const scIds = scList.data?.map((s: any) => s.id) || [];
         if (scIds.length > 0) {
           vilQuery = vilQuery.in('sub_centre_id', scIds);
         } else {
@@ -102,15 +102,15 @@ export default function HierarchyManager() {
       let result;
       if (activeTab === 'talukas') {
         const dId = selectedParentId || (districts[0]?.id);
-        result = await supabase.from('talukas').insert({ name: newName, district_id: dId });
+        result = await (supabase.from('talukas') as any).insert({ name: newName, district_id: dId });
       } else if (activeTab === 'phcs') {
         const tId = isTalukaController ? (employee?.taluka_id || talukas[0]?.id) : selectedParentId;
-        result = await supabase.from('phcs').insert({ name: newName, taluka_id: tId });
+        result = await (supabase.from('phcs') as any).insert({ name: newName, taluka_id: tId });
       } else if (activeTab === 'subcentres') {
         const pId = isPHCController ? (employee?.phc_id || phcs[0]?.id) : selectedParentId;
-        result = await supabase.from('sub_centres').insert({ name: newName, phc_id: pId });
+        result = await (supabase.from('sub_centres') as any).insert({ name: newName, phc_id: pId });
       } else if (activeTab === 'villages') {
-        result = await supabase.from('villages').insert({ name: newName, sub_centre_id: selectedParentId });
+        result = await (supabase.from('villages') as any).insert({ name: newName, sub_centre_id: selectedParentId });
       }
 
       if (result?.error) {

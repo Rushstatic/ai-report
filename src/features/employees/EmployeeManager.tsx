@@ -47,8 +47,8 @@ export default function EmployeeManager() {
         talQuery = talQuery.eq('id', employee.taluka_id);
         phcQuery = phcQuery.eq('taluka_id', employee.taluka_id);
         
-        const phcList = await supabase.from('phcs').select('id').eq('taluka_id', employee.taluka_id);
-        const phcIds = phcList.data?.map(p => p.id) || [];
+        const phcList = await (supabase.from('phcs') as any).select('id').eq('taluka_id', employee.taluka_id);
+        const phcIds = phcList.data?.map((p: any) => p.id) || [];
         if (phcIds.length > 0) {
           scQuery = scQuery.in('phc_id', phcIds);
         } else {

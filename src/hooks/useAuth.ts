@@ -3,7 +3,13 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
-type Employee = Database['public']['Tables']['employees']['Row'];
+export type EmployeeRelation = Database['public']['Tables']['employees']['Row'] & {
+  phcs?: { name: string } | null;
+  sub_centres?: { name: string } | null;
+  talukas?: { name: string } | null;
+};
+
+export type Employee = EmployeeRelation;
 
 interface AuthState {
   session: Session | null;
@@ -97,31 +103,33 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ needsPasswordChange });
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
-        supabase
-          .from('employees')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single()
-          .then(({ data }) => set({ employee: data }))
-          .finally(() => set({ initialized: true }));
-      } else {
-        set({ initialized: true });
+        try {
+          const { data } = await supabase
+            .from('employees')
+            .select('*, phcs(name), sub_centres(name)')
+            .eq('user_id', session.user.id)
+            .single();
+          set({ employee: data as any });
+        } catch {
+          // ignore
+        }
       }
+      set({ initialized: true });
     });
 
     // Listen for auth state changes
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
       set({ session, user: session?.user || null });
       if (session?.user) {
-        supabase
+        const { data } = await supabase
           .from('employees')
-          .select('*')
+          .select('*, phcs(name), sub_centres(name)')
           .eq('user_id', session.user.id)
-          .single()
-          .then(({ data }) => set({ employee: data }));
+          .single();
+        set({ employee: data as any });
       } else {
         set({ employee: null });
       }

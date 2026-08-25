@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Settings, Eye, Save, GripVertical, Pencil } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -27,6 +27,7 @@ export default function FormBuilder() {
   const [formName, setFormName] = useState('');
   const [period, setPeriod] = useState<ReportPeriod>('Monthly');
   const [reportType, setReportType] = useState<ReportType>('VILLAGE_NUMERICAL');
+  const [targetRole, setTargetRole] = useState<string>('ALL');
   const [fields, setFields] = useState<FormField[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -55,6 +56,7 @@ export default function FormBuilder() {
       setFormName('');
       setPeriod('Monthly');
       setReportType('VILLAGE_NUMERICAL');
+      setTargetRole('ALL');
       setFields([]);
       return;
     }
@@ -68,19 +70,20 @@ export default function FormBuilder() {
     setFormName(form.name);
     setPeriod(form.reporting_period as ReportPeriod);
     setReportType(form.report_type as ReportType);
+    setTargetRole(form.target_role || 'ALL');
 
     // Fetch form sections and fields
-    const { data: sections } = await supabase.from('form_sections').select('id').eq('form_id', form.id);
+    const { data: sections } = await (supabase.from('form_sections') as any).select('id').eq('form_id', form.id);
     if (sections && sections.length > 0) {
-      const sectionIds = sections.map(s => s.id);
-      const { data: dbFields } = await supabase
-        .from('form_fields')
+      const sectionIds = sections.map((s: any) => s.id);
+      const { data: dbFields } = await (supabase
+        .from('form_fields') as any)
         .select('*, form_field_options(*)')
         .in('section_id', sectionIds)
         .order('display_order');
 
       if (dbFields) {
-        setFields(dbFields.map(dbf => ({
+        setFields(dbFields.map((dbf: any) => ({
           id: crypto.randomUUID(), // New UUIDs so we insert fresh when saved
           labelEn: dbf.label_en,
           labelMr: dbf.label_mr,
@@ -162,19 +165,20 @@ export default function FormBuilder() {
   
       if (loadedFormId) {
         // Deprecate old form so it doesn't show up in lists for new submissions
-        await supabase.from('forms').update({ active: false }).eq('id', loadedFormId);
+        await (supabase.from('forms') as any).update({ active: false }).eq('id', loadedFormId);
         finalParentId = parentFormId || loadedFormId;
         nextVersion = currentVersion + 1;
       }
 
       // Create the form in Supabase
-      const { data: form, error: formError } = await supabase
-        .from('forms')
+      const { data: form, error: formError } = await (supabase
+        .from('forms') as any)
         .insert({
           name: formName,
           code: formName.toLowerCase().replace(/\s+/g, '_'),
           reporting_period: period,
           report_type: reportType,
+          target_role: targetRole,
           version: nextVersion,
           parent_form_id: finalParentId
         })
@@ -184,8 +188,8 @@ export default function FormBuilder() {
       if (formError) throw formError;
 
       // Create a default section
-      const { data: section, error: sectionError } = await supabase
-        .from('form_sections')
+      const { data: section, error: sectionError } = await (supabase
+        .from('form_sections') as any)
         .insert({ form_id: form.id, title: 'Main Section' })
         .select()
         .single();
@@ -204,8 +208,8 @@ export default function FormBuilder() {
           display_order: index,
         }));
 
-        const { data: insertedFields, error: fieldsError } = await supabase
-          .from('form_fields')
+        const { data: insertedFields, error: fieldsError } = await (supabase
+          .from('form_fields') as any)
           .insert(fieldsToInsert)
           .select();
 
@@ -227,8 +231,8 @@ export default function FormBuilder() {
         });
 
         if (optionsToInsert.length > 0) {
-          const { error: optionsError } = await supabase
-            .from('form_field_options')
+          const { error: optionsError } = await (supabase
+            .from('form_field_options') as any)
             .insert(optionsToInsert);
           
           if (optionsError) throw optionsError;
@@ -449,7 +453,7 @@ export default function FormBuilder() {
                   </div>
                 </div>
 
-                <div className="sm:col-span-3">
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Reporting Period</label>
                   <select
                     value={period}
@@ -463,7 +467,7 @@ export default function FormBuilder() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-3">
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Report Data Type</label>
                   <select
                     value={reportType}
@@ -474,6 +478,22 @@ export default function FormBuilder() {
                     <option value="VILLAGE_PROGRESS">Village-wise Progress Report (Target & Achievement)</option>
                     <option value="LIST">List Report (e.g., Patient List)</option>
                     <option value="SUBCENTRE_LEVEL">Sub-centre Level</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700">Target Role (लागू असलेले पद)</label>
+                  <select
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border"
+                  >
+                    <option value="ALL">All Roles (सर्व कर्मचारी)</option>
+                    <option value="MPW">MPW (Multi-Purpose Worker)</option>
+                    <option value="ANM">ANM (Auxiliary Nurse Midwife)</option>
+                    <option value="CHO">CHO (Community Health Officer)</option>
+                    <option value="PHC_CONTROLLER">PHC Controller</option>
+                    <option value="TALUKA_CONTROLLER">Taluka Controller</option>
                   </select>
                 </div>
               </div>
