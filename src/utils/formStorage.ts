@@ -1,6 +1,13 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { STANDARD_FORMS, StandardFormDefinition } from './syncForms';
 
+export type FormFieldType = 
+  | 'Text' | 'Long Text' | 'Number' | 'Decimal' | 'Mobile Number' 
+  | 'Date' | 'Time' | 'Date & Time' | 'Dropdown' | 'Radio Button' 
+  | 'Checkbox' | 'Yes/No' | 'File Upload' | 'Image Upload' 
+  | 'Village Selector' | 'Employee Selector' | 'Auto Calculated Field' 
+  | 'Read-only Field';
+
 export interface FormOptionItem {
   id?: string;
   labelEn: string;
@@ -8,14 +15,37 @@ export interface FormOptionItem {
   value: string;
 }
 
+export interface ConditionalLogic {
+  dependsOnId: string;
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
+  value: string;
+}
+
+export interface CalculationEngine {
+  formula: string; // e.g., "{fieldId1} + {fieldId2}"
+  hasCondition: boolean;
+  ifCondition?: string; // e.g., "{fieldId1} > 0"
+  thenFormula?: string;
+  elseFormula?: string;
+}
+
 export interface FormFieldItem {
   id: string;
   name?: string;
   labelEn: string;
   labelMr: string;
-  type: 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
+  type: FormFieldType | string;
   required: boolean;
   options?: FormOptionItem[];
+  placeholder?: string;
+  min_value?: string | number;
+  max_value?: string | number;
+  default_value?: string;
+  validation_rule?: string;
+  display_order?: number;
+  help_text?: string;
+  conditional_logic?: ConditionalLogic[];
+  calculation?: CalculationEngine;
 }
 
 export interface StoredForm {

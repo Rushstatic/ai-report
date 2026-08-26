@@ -60,54 +60,63 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] font-sans flex flex-col lg:flex-row overflow-hidden">
-      {/* Mobile sidebar */}
-      <div className={cn("fixed inset-0 z-50 lg:hidden", sidebarOpen ? "block" : "hidden")}>
-        <div className="fixed inset-0 bg-gray-900/80" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 w-64 bg-[#0F172A] text-white flex flex-col">
-          <div className="p-6 border-b border-slate-700 flex justify-between items-center">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-blue-400">{t('header.title')}</h1>
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">{t('header.subtitle')}</p>
-            </div>
-            <button onClick={() => setSidebarOpen(false)} className="text-slate-400">
-              <X className="w-6 h-6" />
-            </button>
+      {/* Mobile sidebar overlay */}
+      <div 
+        className={cn(
+          "fixed inset-0 bg-gray-900/80 z-40 lg:hidden transition-opacity duration-300",
+          sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )} 
+        onClick={() => setSidebarOpen(false)} 
+      />
+
+      {/* Mobile sidebar menu */}
+      <div className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 bg-[#0F172A] text-white flex flex-col lg:hidden transform transition-transform duration-300 ease-in-out",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-6 border-b border-slate-700 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-blue-400">{t('header.title')}</h1>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-1">{t('header.subtitle')}</p>
           </div>
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link
-                  key={item.nameKey}
-                  to={item.href}
-                  className={cn(
-                    isActive ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800",
-                    "group flex items-center px-4 py-3 rounded-lg transition-colors"
-                  )}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className={cn(
-                    isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100",
-                    "mr-3 flex-shrink-0 h-5 w-5"
-                  )} />
-                  <span className="text-sm font-medium">{t(item.nameKey as TranslationKey)}</span>
-                </Link>
-              );
-            })}
-          </nav>
-          <div className="p-4 border-t border-slate-700">
-            <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">
-                {employee?.name?.charAt(0) || 'U'}
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-white">{employee?.name || 'User'}</p>
-                <p className="text-[10px] text-slate-400">{employee?.employee_type?.replace('_', ' ') || 'Guest'}</p>
-              </div>
-              <button onClick={() => signOut()} className="p-2 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors" title="Log out">
-                <LogOut className="w-4 h-4" />
-              </button>
+          <button onClick={() => setSidebarOpen(false)} className="text-slate-400 p-1 hover:bg-slate-800 rounded-md transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {navigation.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <Link
+                key={item.nameKey}
+                to={item.href}
+                className={cn(
+                  isActive ? "bg-blue-600 text-white shadow-lg" : "text-slate-400 hover:bg-slate-800",
+                  "group flex items-center px-4 py-3 rounded-lg transition-colors"
+                )}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <item.icon className={cn(
+                  isActive ? "opacity-100" : "opacity-80 group-hover:opacity-100",
+                  "mr-3 flex-shrink-0 h-5 w-5"
+                )} />
+                <span className="text-sm font-medium">{t(item.nameKey as TranslationKey)}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="p-4 border-t border-slate-700">
+          <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">
+              {employee?.name?.charAt(0) || 'U'}
             </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-xs font-semibold text-white truncate">{employee?.name || 'User'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{employee?.employee_type?.replace('_', ' ') || 'Guest'}</p>
+            </div>
+            <button onClick={() => signOut()} className="p-2 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors" title="Log out">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

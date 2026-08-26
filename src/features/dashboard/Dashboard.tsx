@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [talukaOptions, setTalukaOptions] = useState<any[]>([]);
   const [selectedTalukaId, setSelectedTalukaId] = useState<string>('ALL');
   const [chartData, setChartData] = useState<any[]>([]);
+  const [subcentreChartData, setSubcentreChartData] = useState<any[]>([]);
   const [pendingList, setPendingList] = useState<any[]>([]);
 
   // Employee Sub-centre specific stats
@@ -178,6 +179,31 @@ export default function Dashboard() {
           } else {
             setChartData([]);
           }
+
+          // 5.5 Calculate live chart data grouped by Sub-centre
+          const subcentresMap = new Map<string, { id: string, name: string, submitted: number, pending: number }>();
+          
+          subs.forEach((s: any) => {
+            const scId = s.employees?.sub_centre_id;
+            const scName = s.employees?.sub_centres?.name;
+            if (scId && scName) {
+              if (!subcentresMap.has(scId)) {
+                subcentresMap.set(scId, { id: scId, name: scName, submitted: 0, pending: 0 });
+              }
+              const entry = subcentresMap.get(scId)!;
+              if (s.status === 'Submitted' || s.status === 'Approved') {
+                entry.submitted += 1;
+              } else if (s.status === 'Pending' || s.status === 'Overdue' || s.status === 'Draft') {
+                entry.pending += 1;
+              }
+            }
+          });
+          
+          const scChartDataCalculated = Array.from(subcentresMap.values())
+            .sort((a, b) => (b.pending + b.submitted) - (a.pending + a.submitted)) // sort by total volume
+            .slice(0, 30); // limit to top 30 for visualization
+            
+          setSubcentreChartData(scChartDataCalculated);
 
           // 6. Set pending/overdue records
           setPendingList(pendingSubs.slice(0, 10));
@@ -655,6 +681,36 @@ export default function Dashboard() {
               {t('dash.viewAllPending')}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Sub-centre Performance Chart */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-bold text-slate-800">
+            {language === 'mr' ? 'उपकेंद्र कामगिरी (प्रलंबित वि. सादर)' : 'Sub-centre Performance (Pending vs Submitted)'}
+          </h3>
+        </div>
+        <div className="h-96 w-full">
+          {subcentreChartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+              {language === 'mr' ? 'उपकेंद्रांचे कोणतेही अहवाल आढळले नाहीत.' : 'No Sub-centre submission records found.'}
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={subcentreChartData} margin={{ top: 10, right: 10, left: 0, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} angle={-45} textAnchor="end" height={80} tick={{fontSize: 11, fill: '#64748b'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#64748b'}} />
+                <Tooltip 
+                  cursor={{fill: '#f1f5f9'}} 
+                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'}} 
+                />
+                <Bar dataKey="submitted" name={language === 'mr' ? 'सादर केलेले (Submitted)' : 'Submitted'} stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
+                <Bar dataKey="pending" name={language === 'mr' ? 'प्रलंबित (Pending)' : 'Pending'} stackId="a" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </div>

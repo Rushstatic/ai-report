@@ -31,7 +31,7 @@ import {
   FormOptionItem 
 } from '@/utils/formStorage';
 
-type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
+
 type ReportPeriod = 'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly' | 'Quarterly' | 'Yearly';
 type ReportType = 'VILLAGE_NUMERICAL' | 'VILLAGE_PROGRESS' | 'LIST' | 'SUBCENTRE_LEVEL';
 
@@ -47,6 +47,9 @@ export default function FormBuilder() {
   const [targetRole, setTargetRole] = useState<string>('ALL');
   const [employeeWiseSubmission, setEmployeeWiseSubmission] = useState<boolean>(false);
   const [fields, setFields] = useState<FormFieldItem[]>([]);
+  const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
+
+  const toggleFieldAdvanced = (id: string) => setExpandedFields(prev => ({ ...prev, [id]: !prev[id] }));
   
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -1176,23 +1179,48 @@ export default function FormBuilder() {
                           </label>
                           <select
                             value={field.type}
-                            onChange={(e) => updateField(field.id, { type: e.target.value as FieldType })}
+                            onChange={(e) => updateField(field.id, { type: e.target.value })}
                             className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 pl-3 pr-6 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
                           >
-                            <option value="Number">Number (संख्या)</option>
-                            <option value="Text">Text (मजकूर)</option>
-                            <option value="Yes/No">Yes/No (होय/नाही)</option>
-                            <option value="Date">Date (दिनांक)</option>
-                            <option value="Dropdown">Dropdown (यादी)</option>
+                            <optgroup label="Text & Inputs">
+                              <option value="Text">Text (मजकूर)</option>
+                              <option value="Long Text">Long Text (सविस्तर मजकूर)</option>
+                              <option value="Number">Number (संख्या)</option>
+                              <option value="Decimal">Decimal (दशांश)</option>
+                              <option value="Mobile Number">Mobile Number (मोबाईल)</option>
+                            </optgroup>
+                            <optgroup label="Date & Time">
+                              <option value="Date">Date (दिनांक)</option>
+                              <option value="Time">Time (वेळ)</option>
+                              <option value="Date & Time">Date & Time (दिनांक आणि वेळ)</option>
+                            </optgroup>
+                            <optgroup label="Choices">
+                              <option value="Dropdown">Dropdown (यादी)</option>
+                              <option value="Radio Button">Radio Button (रेडिओ)</option>
+                              <option value="Checkbox">Checkbox (चेकबॉक्स)</option>
+                              <option value="Yes/No">Yes/No (होय/नाही)</option>
+                            </optgroup>
+                            <optgroup label="Media & Selectors">
+                              <option value="File Upload">File Upload (फाईल)</option>
+                              <option value="Image Upload">Image Upload (चित्र)</option>
+                              <option value="Village Selector">Village Selector (गाव निवड)</option>
+                              <option value="Employee Selector">Employee Selector (कर्मचारी निवड)</option>
+                            </optgroup>
+                            <optgroup label="Advanced">
+                              <option value="Auto Calculated Field">Auto Calculated (स्वयंचलित गणना)</option>
+                              <option value="Read-only Field">Read-only (केवळ वाचनासाठी)</option>
+                            </optgroup>
                           </select>
                         </div>
                       )}
 
                       {/* Dropdown Options Editor */}
-                      {reportType !== 'VILLAGE_PROGRESS' && field.type === 'Dropdown' && (
+                      {reportType !== 'VILLAGE_PROGRESS' && ['Dropdown', 'Radio Button', 'Checkbox'].includes(field.type) && (
                         <div className="sm:col-span-12 mt-1 p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Dropdown Options (पर्याय)</span>
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                              {field.type} Options (पर्याय)
+                            </span>
                             <button
                               type="button"
                               onClick={() => addOption(field.id)}
@@ -1236,7 +1264,7 @@ export default function FormBuilder() {
                         </div>
                       )}
 
-                      <div className="sm:col-span-12 flex items-center justify-between mt-1">
+                      <div className="sm:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between mt-2 pt-2 border-t border-slate-100 gap-3">
                         <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                           <input
                             type="checkbox"
@@ -1246,16 +1274,199 @@ export default function FormBuilder() {
                           />
                           <span>{language === 'mr' ? 'अनिवार्य निर्देशक (Required Field *)' : 'Required field *'}</span>
                         </label>
+                        
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleFieldAdvanced(field.id)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                          >
+                            {expandedFields[field.id] ? '- Hide Advanced' : '+ Show Advanced'}
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => removeField(field.id)}
-                          className="inline-flex items-center text-xs text-red-600 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          {language === 'mr' ? 'काढून टाका' : 'Remove'}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => removeField(field.id)}
+                            className="inline-flex items-center text-xs text-red-600 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            {language === 'mr' ? 'काढून टाका' : 'Remove'}
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Advanced Settings */}
+                      {expandedFields[field.id] && (
+                        <div className="sm:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 p-4 bg-slate-100/50 rounded-lg border border-slate-200">
+                          {/* Common Options */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Placeholder (उदा.)</label>
+                            <input 
+                              type="text" 
+                              value={field.placeholder || ''} 
+                              onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
+                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Help Text / Info</label>
+                            <input 
+                              type="text" 
+                              value={field.help_text || ''} 
+                              onChange={(e) => updateField(field.id, { help_text: e.target.value })}
+                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                            />
+                          </div>
+
+                          {(field.type === 'Number' || field.type === 'Decimal') && (
+                            <>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Minimum Value</label>
+                                <input 
+                                  type="number" 
+                                  value={field.min_value || ''} 
+                                  onChange={(e) => updateField(field.id, { min_value: e.target.value })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Maximum Value</label>
+                                <input 
+                                  type="number" 
+                                  value={field.max_value || ''} 
+                                  onChange={(e) => updateField(field.id, { max_value: e.target.value })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {/* Conditional Logic UI */}
+                          <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1">
+                            <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">Conditional Logic (Show IF)</h4>
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                              <select
+                                className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                value={field.conditional_logic?.[0]?.dependsOnId || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (!val) {
+                                    updateField(field.id, { conditional_logic: undefined });
+                                  } else {
+                                    updateField(field.id, {
+                                      conditional_logic: [{
+                                        dependsOnId: val,
+                                        operator: field.conditional_logic?.[0]?.operator || '==',
+                                        value: field.conditional_logic?.[0]?.value || ''
+                                      }]
+                                    });
+                                  }
+                                }}
+                              >
+                                <option value="">Always Show (Never Hide)</option>
+                                {fields.filter(f => f.id !== field.id).map(f => (
+                                  <option key={f.id} value={f.id}>{f.labelEn} ({f.type})</option>
+                                ))}
+                              </select>
+
+                              {field.conditional_logic?.[0] && (
+                                <>
+                                  <select
+                                    className="w-full sm:w-1/4 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                    value={field.conditional_logic[0].operator}
+                                    onChange={(e) => updateField(field.id, {
+                                      conditional_logic: [{ ...field.conditional_logic![0], operator: e.target.value as any }]
+                                    })}
+                                  >
+                                    <option value="==">Equals (==)</option>
+                                    <option value="!=">Not Equal (!=)</option>
+                                    <option value=">">Greater Than (&gt;)</option>
+                                    <option value="<">Less Than (&lt;)</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Value (e.g. Yes)"
+                                    value={field.conditional_logic[0].value}
+                                    onChange={(e) => updateField(field.id, {
+                                      conditional_logic: [{ ...field.conditional_logic![0], value: e.target.value }]
+                                    })}
+                                    className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Calculation Engine UI */}
+                          {field.type === 'Auto Calculated Field' && (
+                            <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1 bg-amber-50/50 -mx-4 px-4 pb-2 rounded-b-lg">
+                              <h4 className="text-xs font-bold text-amber-700 uppercase mb-2">Calculation Engine Formula</h4>
+                              <p className="text-[10px] text-slate-500 mb-2">
+                                Use field names enclosed in curly braces, e.g., <code>{'{field1}'} + {'{field2}'}</code>.
+                                Operations: +, -, *, /, %
+                              </p>
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. ({Male_Count} + {Female_Count}) / {Total_Days}"
+                                  value={field.calculation?.formula || ''}
+                                  onChange={(e) => updateField(field.id, {
+                                    calculation: { ...field.calculation, hasCondition: field.calculation?.hasCondition || false, formula: e.target.value }
+                                  })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1.5 px-2 border font-mono bg-white"
+                                />
+
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.calculation?.hasCondition || false}
+                                    onChange={(e) => updateField(field.id, {
+                                      calculation: { formula: field.calculation?.formula || '', hasCondition: e.target.checked }
+                                    })}
+                                    className="h-3.5 w-3.5 text-amber-600 rounded border-slate-300"
+                                  />
+                                  <span>Use IF/ELSE Conditional Logic (e.g. IF Target &gt; 0)</span>
+                                </label>
+
+                                {field.calculation?.hasCondition && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white p-2 border border-amber-200 rounded-md">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">IF Condition</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. {Target} > 0"
+                                        value={field.calculation?.ifCondition || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, ifCondition: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">THEN Formula</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. {Achievement} / {Target} * 100"
+                                        value={field.calculation?.thenFormula || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, thenFormula: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">ELSE Formula</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 0"
+                                        value={field.calculation?.elseFormula || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, elseFormula: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
