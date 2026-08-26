@@ -17,7 +17,8 @@ import {
   Database,
   UserCheck,
   Users,
-  Building2
+  Building2,
+  GripVertical
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -155,6 +156,109 @@ export default function FormBuilder() {
     }
     
     setFields(fields.filter(f => !idsToRemove.has(f.id)));
+  };
+
+
+  // Drag and Drop Logic
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, allowSub: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    el.classList.remove('border-t-blue-500', 'border-b-blue-500', 'border-t-2', 'border-b-2', 'bg-blue-50');
+
+    if (allowSub && y > height * 0.25 && y < height * 0.75) {
+      el.classList.add('bg-blue-50');
+    } else if (y < height * 0.5) {
+      el.classList.add('border-t-blue-500', 'border-t-2');
+    } else {
+      el.classList.add('border-b-blue-500', 'border-b-2');
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.classList.remove('border-t-blue-500', 'border-b-blue-500', 'border-t-2', 'border-b-2', 'bg-blue-50');
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string, allowSub: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.classList.remove('border-t-blue-500', 'border-b-blue-500', 'border-t-2', 'border-b-2', 'bg-blue-50');
+
+    const sourceId = e.dataTransfer.getData('text/plain');
+    if (!sourceId || sourceId === targetId) return;
+
+    const newFields = [...fields];
+    const sourceField = newFields.find(f => f.id === sourceId);
+    const targetField = newFields.find(f => f.id === targetId);
+    if (!sourceField || !targetField) return;
+
+    // Prevent cyclic nesting
+    let current = targetField;
+    while (current.parent_field_id) {
+      if (current.parent_field_id === sourceId) {
+        // Cannot drop parent into its own child
+        return;
+      }
+      const nextParent = newFields.find(f => f.id === current.parent_field_id);
+      if (!nextParent) break;
+      current = nextParent;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    let newParentId = targetField.parent_field_id;
+    let isChildDrop = false;
+    let insertBefore = false;
+
+    if (allowSub && y > height * 0.25 && y < height * 0.75) {
+      newParentId = targetField.id;
+      isChildDrop = true;
+    } else if (y < height * 0.5) {
+      insertBefore = true;
+    }
+
+    sourceField.parent_field_id = newParentId || null;
+
+    const siblings = newFields
+      .filter(f => f.parent_field_id === newParentId && f.id !== sourceId)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+
+    if (isChildDrop) {
+      siblings.push(sourceField);
+    } else {
+      const targetSiblingIndex = siblings.findIndex(f => f.id === targetId);
+      if (targetSiblingIndex !== -1) {
+        if (insertBefore) {
+          siblings.splice(targetSiblingIndex, 0, sourceField);
+        } else {
+          siblings.splice(targetSiblingIndex + 1, 0, sourceField);
+        }
+      } else {
+        siblings.push(sourceField);
+      }
+    }
+
+    siblings.forEach((s, idx) => {
+      const f = newFields.find(x => x.id === s.id);
+      if (f) f.display_order = idx;
+    });
+
+    setFields(newFields);
   };
 
   const moveField = (id: string, direction: 'up' | 'down') => {
@@ -558,9 +662,17 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
     <div 
       style={{ marginLeft: `${depth * 2}rem` }}
       className="relative bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-300 transition-all shadow-xs"
+      draggable={true}
+      onDragStart={(e) => handleDragStart(e, field.id)}
+      onDragOver={(e) => handleDragOver(e, field.allow_sub_fields || false)}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => handleDrop(e, field.id, field.allow_sub_fields || false)}
     >
                     {/* Index & Reorder */}
                     <div className="flex sm:flex-col items-center gap-1">
+                      <div className="text-slate-300 cursor-move hover:text-blue-500 mb-1" title="Drag to reorder/reparent">
+                        <GripVertical className="h-4 w-4" />
+                      </div>
                       <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
                         {index + 1}
                       </span>
