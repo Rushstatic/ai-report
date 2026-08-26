@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+/* Compact Mode Overrides */
+.compact-mode input,
+.compact-mode select,
+.compact-mode button {
+  font-size: 0.75rem !important; /* text-xs */
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+.compact-mode label {
+  font-size: 0.65rem !important;
+}

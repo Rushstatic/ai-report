@@ -18,7 +18,8 @@ import {
   UserCheck,
   Users,
   Building2,
-  GripVertical
+  GripVertical,
+  Monitor
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +49,7 @@ export default function FormBuilder() {
   const [reportType, setReportType] = useState<ReportType>('VILLAGE_NUMERICAL');
   const [targetRole, setTargetRole] = useState<string>('ALL');
   const [employeeWiseSubmission, setEmployeeWiseSubmission] = useState<boolean>(false);
+  const [compactMode, setCompactMode] = useState<boolean>(false);
   const [fields, setFields] = useState<FormFieldItem[]>([]);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
 
@@ -660,8 +662,8 @@ export default function FormBuilder() {
 const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0): React.ReactNode => (
   <React.Fragment key={field.id}>
     <div 
-      style={{ marginLeft: `${depth * 2}rem` }}
-      className="relative bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-300 transition-all shadow-xs"
+      style={{ marginLeft: compactMode ? `${depth * 1}rem` : `${depth * 2}rem` }}
+      className={`relative bg-slate-50/80 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-start hover:border-blue-300 transition-all shadow-xs ${compactMode ? 'p-2 gap-2' : 'p-4 gap-4'}`}
       draggable={true}
       onDragStart={(e) => handleDragStart(e, field.id)}
       onDragOver={(e) => handleDragOver(e, field.allow_sub_fields || false)}
@@ -1073,6 +1075,16 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
         </div>
 
         <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={() => setCompactMode(!compactMode)}
+            className={`inline-flex items-center px-3 py-2 border shadow-xs text-sm font-medium rounded-lg transition-colors ${compactMode ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+            title="Compact Mode for Nested View"
+          >
+            <Monitor className="mr-2 h-4 w-4" />
+            {language === 'mr' ? 'कॉम्पॅक्ट मोड' : 'Compact Mode'}
+          </button>
+          
           <button 
             type="button"
             onClick={() => setIsPreviewMode(!isPreviewMode)}
@@ -1635,7 +1647,7 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className={`space-y-4 ${compactMode ? 'compact-mode' : ''}`}>
               {fields.length === 0 ? (
                 <div className="text-center py-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl">
                   <Settings className="mx-auto h-10 w-10 text-slate-400" />
