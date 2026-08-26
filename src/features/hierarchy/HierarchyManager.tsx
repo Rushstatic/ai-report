@@ -29,6 +29,8 @@ export default function HierarchyManager() {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState('');
+  const [population, setPopulation] = useState<number | ''>('');
+  const [houseCount, setHouseCount] = useState<number | ''>('');
 
   useEffect(() => {
     fetchHierarchy();
@@ -116,7 +118,22 @@ export default function HierarchyManager() {
         const pId = isPHCController ? (employee?.phc_id || phcs[0]?.id) : selectedParentId;
         result = await (supabase.from('sub_centres') as any).insert({ name: newName, phc_id: pId });
       } else if (activeTab === 'villages') {
-        result = await (supabase.from('villages') as any).insert({ name: newName, sub_centre_id: selectedParentId });
+        result = await (supabase.from('villages') as any).insert({ 
+          name: newName, 
+          sub_centre_id: selectedParentId,
+          population: population ? Number(population) : 0,
+          house_count: houseCount ? Number(houseCount) : 0
+        }).select().single();
+        
+        if (result.data) {
+          // Also insert to village_master_data
+          await (supabase.from('village_master_data') as any).insert({
+            village_id: result.data.id,
+            population: population ? Number(population) : 0,
+            house_count: houseCount ? Number(houseCount) : 0,
+            is_current: true
+          });
+        }
       }
 
       if (result?.error) {
@@ -152,6 +169,8 @@ export default function HierarchyManager() {
         <button
           onClick={() => {
             setNewName('');
+            setPopulation('');
+            setHouseCount('');
             let defaultId = '';
             if (isTalukaController && activeTab === 'phcs' && employee?.taluka_id) {
               defaultId = employee.taluka_id;
@@ -296,6 +315,35 @@ export default function HierarchyManager() {
                   placeholder={`Enter ${activeTab === 'talukas' ? 'Taluka' : activeTab === 'phcs' ? 'PHC' : activeTab === 'subcentres' ? 'Sub-centre' : 'Village'} name`}
                 />
               </div>
+              
+              {activeTab === 'villages' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Population</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={population}
+                      onChange={(e) => setPopulation(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g. 1500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">House Count / Households</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={houseCount}
+                      onChange={(e) => setHouseCount(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="block w-full rounded-md border-gray-300 border py-2 px-3 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="e.g. 300"
+                    />
+                  </div>
+                </>
+              )}
               
               <div className="pt-4 flex justify-end gap-3">
                 <button

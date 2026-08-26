@@ -18,16 +18,20 @@ import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
 import { getFormWithFields } from '@/utils/formStorage';
 
-type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No';
+type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No' | 'Auto Calculated Field' | 'Read-only Field' | 'Master Data Field';
 
 interface FormField {
   id: string;
   name: string;
   label_en: string;
   label_mr: string;
-  field_type: FieldType;
+  field_type: FieldType | string;
   is_required: boolean;
   options?: { id: string; label_en: string; label_mr: string; value: string }[];
+  master_data_source?: string;
+  master_data_field?: string;
+  master_data_mode?: string;
+  calculation_formula?: string;
 }
 
 interface FormDefinition {
@@ -166,7 +170,7 @@ export default function ReportSubmission() {
           }
         } else {
           // Controller or General user
-          const { data: vData } = await (supabase.from('villages') as any).select('id, name, code').limit(20);
+          const { data: vData } = await (supabase.from('villages') as any).select('id, name, code, population, house_count').limit(100);
           if (vData && vData.length > 0) {
             setVillages(vData);
             setSelectedVillageId(vData[0].id);
@@ -218,6 +222,25 @@ export default function ReportSubmission() {
 
     loadData();
   }, [formId, submissionId, employee]);
+
+    const handleVillageChange = (vId: string) => {
+    setSelectedVillageId(vId);
+    if (!form || !form.fields) return;
+    
+    const v = villages.find(x => x.id === vId);
+    if (v) {
+      const newData = { ...formData };
+      form.fields.forEach(f => {
+        if (f.field_type === 'Master Data Field' && f.master_data_source === 'VILLAGE_MASTER') {
+          if (f.master_data_field === 'Population') newData[f.id] = v.population || 0;
+          if (f.master_data_field === 'House Count') newData[f.id] = v.house_count || 0;
+          if (f.master_data_field === 'Village Name') newData[f.id] = v.name;
+          if (f.master_data_field === 'Village Code') newData[f.id] = v.code || '';
+        }
+      });
+      setFormData(newData);
+    }
+  };
 
   const handleInputChange = (fieldId: string, value: any) => {
     setFormData(prev => ({
@@ -325,7 +348,75 @@ export default function ReportSubmission() {
   };
 
   if (loading) {
-    return (
+  
+  // Auto-calculation Engine
+  useEffect(() => {
+    if (!form || !form.fields) return;
+
+    let hasChanges = false;
+    const newData = { ...formData };
+
+    form.fields.filter(f => f.field_type === 'Auto Calculated Field' && f.calculation_formula).forEach(calcField => {
+      try {
+        const calcObj = JSON.parse(calcField.calculation_formula!);
+        if (!calcObj.formula) return;
+        
+        let formulaStr = calcObj.formula;
+        let canEvaluate = true;
+
+        // Replace all {field_name} with actual values
+        const matches = formulaStr.match(/\{([^}]+)\}/g);
+        if (matches) {
+          matches.forEach((m: string) => {
+            const fieldName = m.slice(1, -1);
+            // Find the field with this label
+            const sourceField = form.fields.find(f => (f.label_en || f.label_mr) === fieldName || f.id === fieldName);
+            if (sourceField) {
+              const val = newData[sourceField.id];
+              if (val === undefined || val === '') {
+                canEvaluate = false; // Missing data
+              } else {
+                formulaStr = formulaStr.replace(m, String(val));
+              }
+            } else {
+              canEvaluate = false;
+            }
+          });
+        }
+
+        if (canEvaluate) {
+          // Replace SUM( ) and AVG( ) safely if they exist
+          formulaStr = formulaStr.replace(/SUM\(\s*\)/g, '0'); // Placeholder if SUM isn't fully implemented
+          formulaStr = formulaStr.replace(/AVG\(\s*\)/g, '0');
+          
+          // Evaluate safely
+          // eslint-disable-next-line no-new-func
+          const result = new Function('return ' + formulaStr)();
+          
+          if (!isNaN(result) && result !== Infinity && result !== -Infinity) {
+            const finalVal = Number.isInteger(result) ? result : Number(result.toFixed(2));
+            if (newData[calcField.id] !== finalVal) {
+              newData[calcField.id] = finalVal;
+              hasChanges = true;
+            }
+          }
+        } else {
+          if (newData[calcField.id] !== '') {
+            newData[calcField.id] = '';
+            hasChanges = true;
+          }
+        }
+      } catch (err) {
+        console.error('Calculation error for', calcField.label_en, err);
+      }
+    });
+
+    if (hasChanges) {
+      setFormData(newData);
+    }
+  }, [formData, form]);
+
+  return (
       <div className="flex justify-center items-center h-64 text-slate-500">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
         {language === 'mr' ? 'अहवाल लोड होत आहे...' : 'Loading report form...'}
@@ -462,7 +553,7 @@ export default function ReportSubmission() {
               ) : villages.length > 0 ? (
                 <select
                   value={selectedVillageId}
-                  onChange={(e) => setSelectedVillageId(e.target.value)}
+                  onChange={(e) => handleVillageChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded text-xs py-1 px-2 font-medium text-slate-800 focus:ring-1 focus:ring-blue-500"
                 >
                   {villages.map(v => (
@@ -506,6 +597,12 @@ export default function ReportSubmission() {
                   </span>
                   {field.is_required && <span className="text-red-500 ml-1 font-bold">*</span>}
                 </label>
+
+                                {(field.field_type === 'Master Data Field' || field.field_type === 'Auto Calculated Field' || field.field_type === 'Read-only Field') && (
+                  <div className={`w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 ${field.field_type === 'Master Data Field' ? 'border-purple-200 text-purple-900 bg-purple-50 font-semibold' : 'border-slate-200 text-slate-600'}`}>
+                    {formData[field.id] !== undefined && formData[field.id] !== '' ? formData[field.id] : (field.field_type === 'Master Data Field' ? (language === 'mr' ? 'आपोआप भरले जाईल' : 'Auto-populated') : '-')}
+                  </div>
+                )}
 
                 {field.field_type === 'Number' && (
                   <input

@@ -49,6 +49,9 @@ export interface FormFieldItem {
   parent_field_id?: string | null;
   allow_sub_fields?: boolean;
   children?: FormFieldItem[];
+  master_data_source?: string;
+  master_data_field?: string;
+  master_data_mode?: 'DISPLAY_ONLY' | 'CALCULATION_SOURCE';
 }
 
 export interface StoredForm {

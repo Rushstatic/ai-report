@@ -1,0 +1,1 @@
+ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS house_count INTEGER DEFAULT 0;
