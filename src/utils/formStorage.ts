@@ -46,6 +46,9 @@ export interface FormFieldItem {
   help_text?: string;
   conditional_logic?: ConditionalLogic[];
   calculation?: CalculationEngine;
+  parent_field_id?: string | null;
+  allow_sub_fields?: boolean;
+  children?: FormFieldItem[];
 }
 
 export interface StoredForm {
@@ -307,4 +310,39 @@ export async function getFormWithFields(formIdOrCode: string): Promise<StoredFor
   }
 
   return localMatch || null;
+}
+
+// Form Field Hierarchy Utility
+export function buildFieldTree(fields: FormFieldItem[]): FormFieldItem[] {
+  const fieldMap = new Map<string, FormFieldItem>();
+  const roots: FormFieldItem[] = [];
+
+  // Create deep copies to avoid mutating original objects
+  fields.forEach(f => {
+    fieldMap.set(f.id, { ...f, children: [] });
+  });
+
+  fieldMap.forEach(f => {
+    if (f.parent_field_id && fieldMap.has(f.parent_field_id)) {
+      fieldMap.get(f.parent_field_id)!.children!.push(f);
+    } else {
+      roots.push(f);
+    }
+  });
+
+  return roots.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+}
+
+export function flattenFieldTree(tree: FormFieldItem[], parentId: string | null = null): FormFieldItem[] {
+  let flat: FormFieldItem[] = [];
+  tree.forEach((node, index) => {
+    const flatNode = { ...node, parent_field_id: parentId, display_order: index };
+    const children = flatNode.children || [];
+    delete flatNode.children;
+    flat.push(flatNode);
+    if (children.length > 0) {
+      flat = flat.concat(flattenFieldTree(children, flatNode.id));
+    }
+  });
+  return flat;
 }

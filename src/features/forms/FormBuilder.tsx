@@ -28,7 +28,8 @@ import {
   saveLocalForm, 
   StoredForm, 
   FormFieldItem, 
-  FormOptionItem 
+  FormOptionItem,
+  buildFieldTree
 } from '@/utils/formStorage';
 
 
@@ -122,7 +123,7 @@ export default function FormBuilder() {
     setFields(fullForm.fields || []);
   };
 
-  const addField = () => {
+  const addField = (parentId: string | null = null) => {
     setFields([
       ...fields, 
       { 
@@ -131,7 +132,9 @@ export default function FormBuilder() {
         labelMr: '', 
         type: 'Number', 
         required: true,
-        options: []
+        options: [],
+        parent_field_id: parentId,
+        allow_sub_fields: false,
       }
     ]);
   };
@@ -141,19 +144,50 @@ export default function FormBuilder() {
   };
 
   const removeField = (id: string) => {
-    setFields(fields.filter(f => f.id !== id));
+    // Collect all descendants to remove
+    const idsToRemove = new Set([id]);
+    let currentIds = [id];
+    
+    while (currentIds.length > 0) {
+      const nextIds = fields.filter(f => currentIds.includes(f.parent_field_id as string)).map(f => f.id);
+      nextIds.forEach(nid => idsToRemove.add(nid));
+      currentIds = nextIds;
+    }
+    
+    setFields(fields.filter(f => !idsToRemove.has(f.id)));
   };
 
-  const moveField = (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === fields.length - 1) return;
+  const moveField = (id: string, direction: 'up' | 'down') => {
+    const fieldIndex = fields.findIndex(f => f.id === id);
+    if (fieldIndex === -1) return;
+    const field = fields[fieldIndex];
     
-    const newFields = [...fields];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    const temp = newFields[index];
-    newFields[index] = newFields[targetIndex];
-    newFields[targetIndex] = temp;
-    setFields(newFields);
+    const siblings = fields.filter(f => f.parent_field_id === field.parent_field_id).sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    const siblingIndex = siblings.findIndex(f => f.id === id);
+    
+    if (direction === 'up' && siblingIndex > 0) {
+      const prevSibling = siblings[siblingIndex - 1];
+      const newFields = [...fields];
+      const idx1 = newFields.findIndex(f => f.id === id);
+      const idx2 = newFields.findIndex(f => f.id === prevSibling.id);
+      
+      const tempOrder = newFields[idx1].display_order || idx1;
+      newFields[idx1].display_order = newFields[idx2].display_order || idx2;
+      newFields[idx2].display_order = tempOrder;
+      
+      setFields(newFields);
+    } else if (direction === 'down' && siblingIndex < siblings.length - 1) {
+      const nextSibling = siblings[siblingIndex + 1];
+      const newFields = [...fields];
+      const idx1 = newFields.findIndex(f => f.id === id);
+      const idx2 = newFields.findIndex(f => f.id === nextSibling.id);
+      
+      const tempOrder = newFields[idx1].display_order || idx1;
+      newFields[idx1].display_order = newFields[idx2].display_order || idx2;
+      newFields[idx2].display_order = tempOrder;
+      
+      setFields(newFields);
+    }
   };
 
   const addOption = (fieldId: string) => {
@@ -435,13 +469,23 @@ export default function FormBuilder() {
               .slice(0, 40) || `field_${index + 1}`;
 
             return {
+              id: f.id,
               section_id: sectionId,
+              parent_field_id: f.parent_field_id || null,
               label_en: f.labelEn.trim() || f.labelMr.trim(),
               label_mr: f.labelMr.trim() || f.labelEn.trim(),
               name: `${safeName}_${index + 1}`,
               field_type: f.type,
               is_required: f.required,
+              allow_sub_fields: f.allow_sub_fields || false,
               display_order: index,
+              placeholder: f.placeholder || null,
+              min_value: f.min_value?.toString() || null,
+              max_value: f.max_value?.toString() || null,
+              default_value: f.default_value || null,
+              help_text: f.help_text || null,
+              calculation_formula: f.calculation ? JSON.stringify(f.calculation) : null,
+              conditional_logic: f.conditional_logic ? f.conditional_logic : null,
             };
           });
 
@@ -508,6 +552,395 @@ export default function FormBuilder() {
     await loadAllForms();
     setIsSaving(false);
   };
+
+const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0): React.ReactNode => (
+  <React.Fragment key={field.id}>
+    <div 
+      style={{ marginLeft: `${depth * 2}rem` }}
+      className="relative bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-300 transition-all shadow-xs"
+    >
+                    {/* Index & Reorder */}
+                    <div className="flex sm:flex-col items-center gap-1">
+                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
+                        {index + 1}
+                      </span>
+                      <div className="flex sm:flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => moveField(field.id, 'up')}
+                          disabled={index === 0}
+                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveField(field.id, 'down')}
+                          disabled={index === fields.length - 1}
+                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inputs */}
+                    <div className="flex-1 w-full grid grid-cols-1 gap-y-3 gap-x-4 sm:grid-cols-12">
+                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          {language === 'mr' ? 'नाव (इंग्रजी / English)' : 'Field Label (English)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={field.labelEn}
+                          onChange={(e) => updateField(field.id, { labelEn: e.target.value })}
+                          className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          placeholder="e.g., Fever Cases Examined"
+                        />
+                      </div>
+
+                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          {language === 'mr' ? 'नाव (मराठी / Marathi)' : 'Field Label (Marathi)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={field.labelMr}
+                          onChange={(e) => updateField(field.id, { labelMr: e.target.value })}
+                          className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          placeholder="उदा. तपासलेले तापाचे रुग्ण"
+                        />
+                      </div>
+
+                      {reportType !== 'VILLAGE_PROGRESS' && (
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                            {language === 'mr' ? 'प्रकार (Type)' : 'Type'}
+                          </label>
+                          <select
+                            value={field.type}
+                            onChange={(e) => updateField(field.id, { type: e.target.value })}
+                            className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 pl-3 pr-6 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
+                          >
+                            <optgroup label="Text & Inputs">
+                              <option value="Text">Text (मजकूर)</option>
+                              <option value="Long Text">Long Text (सविस्तर मजकूर)</option>
+                              <option value="Number">Number (संख्या)</option>
+                              <option value="Decimal">Decimal (दशांश)</option>
+                              <option value="Mobile Number">Mobile Number (मोबाईल)</option>
+                            </optgroup>
+                            <optgroup label="Date & Time">
+                              <option value="Date">Date (दिनांक)</option>
+                              <option value="Time">Time (वेळ)</option>
+                              <option value="Date & Time">Date & Time (दिनांक आणि वेळ)</option>
+                            </optgroup>
+                            <optgroup label="Choices">
+                              <option value="Dropdown">Dropdown (यादी)</option>
+                              <option value="Radio Button">Radio Button (रेडिओ)</option>
+                              <option value="Checkbox">Checkbox (चेकबॉक्स)</option>
+                              <option value="Yes/No">Yes/No (होय/नाही)</option>
+                            </optgroup>
+                            <optgroup label="Media & Selectors">
+                              <option value="File Upload">File Upload (फाईल)</option>
+                              <option value="Image Upload">Image Upload (चित्र)</option>
+                              <option value="Village Selector">Village Selector (गाव निवड)</option>
+                              <option value="Employee Selector">Employee Selector (कर्मचारी निवड)</option>
+                            </optgroup>
+                            <optgroup label="Advanced">
+                              <option value="Auto Calculated Field">Auto Calculated (स्वयंचलित गणना)</option>
+                              <option value="Read-only Field">Read-only (केवळ वाचनासाठी)</option>
+                            </optgroup>
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Dropdown Options Editor */}
+                      {reportType !== 'VILLAGE_PROGRESS' && ['Dropdown', 'Radio Button', 'Checkbox'].includes(field.type) && (
+                        <div className="sm:col-span-12 mt-1 p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                              {field.type} Options (पर्याय)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addOption(field.id)}
+                              className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-700"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Option
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {field.options?.map((option, optIdx) => (
+                              <div key={option.id || optIdx} className="flex items-center gap-2">
+                                <span className="text-xs text-slate-400 w-4 font-bold">{optIdx + 1}.</span>
+                                <input
+                                  type="text"
+                                  placeholder="Option EN (e.g. Normal)"
+                                  value={option.labelEn}
+                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelEn: e.target.value })}
+                                  className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Option MR (उदा. सामान्य)"
+                                  value={option.labelMr}
+                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelMr: e.target.value })}
+                                  className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeOption(field.id, option.id || `${optIdx}`)}
+                                  className="text-slate-400 hover:text-red-500 p-1"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                            {(!field.options || field.options.length === 0) && (
+                              <p className="text-xs text-slate-400 italic">No options added yet.</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="sm:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between mt-2 pt-2 border-t border-slate-100 gap-3">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={field.required}
+                            onChange={(e) => updateField(field.id, { required: e.target.checked })}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
+                          />
+                          <span>{language === 'mr' ? 'अनिवार्य निर्देशक (Required Field *)' : 'Required field *'}</span>
+                        </label>
+                        
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleFieldAdvanced(field.id)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                          >
+                            {expandedFields[field.id] ? '- Hide Advanced' : '+ Show Advanced'}
+                          </button>
+
+                          {field.allow_sub_fields && (
+                            <button
+                              type="button"
+                              onClick={() => addField(field.id)}
+                              className="inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-semibold p-1 hover:bg-blue-50 rounded"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              {language === 'mr' ? '+ उप-निर्देशक' : '+ Sub-field'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeField(field.id)}
+                            className="inline-flex items-center text-xs text-red-600 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            {language === 'mr' ? 'काढून टाका' : 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Advanced Settings */}
+                      {expandedFields[field.id] && (
+                        <div className="sm:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 p-4 bg-slate-100/50 rounded-lg border border-slate-200">
+                          {/* Common Options */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Placeholder (उदा.)</label>
+                            <input 
+                              type="text" 
+                              value={field.placeholder || ''} 
+                              onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
+                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Help Text / Info</label>
+                            <input 
+                              type="text" 
+                              value={field.help_text || ''} 
+                              onChange={(e) => updateField(field.id, { help_text: e.target.value })}
+                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                            />
+                          </div>
+
+                          {(field.type === 'Number' || field.type === 'Decimal') && (
+                            <>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Minimum Value</label>
+                                <input 
+                                  type="number" 
+                                  value={field.min_value || ''} 
+                                  onChange={(e) => updateField(field.id, { min_value: e.target.value })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Maximum Value</label>
+                                <input 
+                                  type="number" 
+                                  value={field.max_value || ''} 
+                                  onChange={(e) => updateField(field.id, { max_value: e.target.value })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={field.allow_sub_fields || false}
+                                onChange={(e) => updateField(field.id, { allow_sub_fields: e.target.checked })}
+                                className="h-4 w-4 text-blue-600 rounded border-slate-300"
+                              />
+                              <span>{language === 'mr' ? 'उपनियमावली (Allow Sub-fields)' : 'Allow Sub-fields (Nested Hierarchy)'}</span>
+                            </label>
+                          </div>
+
+                          {/* Conditional Logic UI */}
+                          <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1">
+                            <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">Conditional Logic (Show IF)</h4>
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                              <select
+                                className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                value={field.conditional_logic?.[0]?.dependsOnId || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (!val) {
+                                    updateField(field.id, { conditional_logic: undefined });
+                                  } else {
+                                    updateField(field.id, {
+                                      conditional_logic: [{
+                                        dependsOnId: val,
+                                        operator: field.conditional_logic?.[0]?.operator || '==',
+                                        value: field.conditional_logic?.[0]?.value || ''
+                                      }]
+                                    });
+                                  }
+                                }}
+                              >
+                                <option value="">Always Show (Never Hide)</option>
+                                {fields.filter(f => f.id !== field.id).map(f => (
+                                  <option key={f.id} value={f.id}>{f.labelEn} ({f.type})</option>
+                                ))}
+                              </select>
+
+                              {field.conditional_logic?.[0] && (
+                                <>
+                                  <select
+                                    className="w-full sm:w-1/4 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                    value={field.conditional_logic[0].operator}
+                                    onChange={(e) => updateField(field.id, {
+                                      conditional_logic: [{ ...field.conditional_logic![0], operator: e.target.value as any }]
+                                    })}
+                                  >
+                                    <option value="==">Equals (==)</option>
+                                    <option value="!=">Not Equal (!=)</option>
+                                    <option value=">">Greater Than (&gt;)</option>
+                                    <option value="<">Less Than (&lt;)</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Value (e.g. Yes)"
+                                    value={field.conditional_logic[0].value}
+                                    onChange={(e) => updateField(field.id, {
+                                      conditional_logic: [{ ...field.conditional_logic![0], value: e.target.value }]
+                                    })}
+                                    className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Calculation Engine UI */}
+                          {field.type === 'Auto Calculated Field' && (
+                            <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1 bg-amber-50/50 -mx-4 px-4 pb-2 rounded-b-lg">
+                              <h4 className="text-xs font-bold text-amber-700 uppercase mb-2">Calculation Engine Formula</h4>
+                              <p className="text-[10px] text-slate-500 mb-2">
+                                Use field names enclosed in curly braces, e.g., <code>{'{field1}'} + {'{field2}'}</code>.
+                                Operations: +, -, *, /, %
+                              </p>
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. ({Male_Count} + {Female_Count}) / {Total_Days}"
+                                  value={field.calculation?.formula || ''}
+                                  onChange={(e) => updateField(field.id, {
+                                    calculation: { ...field.calculation, hasCondition: field.calculation?.hasCondition || false, formula: e.target.value }
+                                  })}
+                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1.5 px-2 border font-mono bg-white"
+                                />
+
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={field.calculation?.hasCondition || false}
+                                    onChange={(e) => updateField(field.id, {
+                                      calculation: { formula: field.calculation?.formula || '', hasCondition: e.target.checked }
+                                    })}
+                                    className="h-3.5 w-3.5 text-amber-600 rounded border-slate-300"
+                                  />
+                                  <span>Use IF/ELSE Conditional Logic (e.g. IF Target &gt; 0)</span>
+                                </label>
+
+                                {field.calculation?.hasCondition && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white p-2 border border-amber-200 rounded-md">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">IF Condition</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. {Target} > 0"
+                                        value={field.calculation?.ifCondition || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, ifCondition: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">THEN Formula</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. {Achievement} / {Target} * 100"
+                                        value={field.calculation?.thenFormula || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, thenFormula: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">ELSE Formula</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 0"
+                                        value={field.calculation?.elseFormula || ''}
+                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, elseFormula: e.target.value } })}
+                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                    {/* Render Children */}
+                    {field.children && field.children.length > 0 && (
+                      <div className="w-full mt-4 space-y-4 border-l-2 border-blue-200 pl-4">
+                        {field.children.map((child, childIdx) => renderFieldNode(child, childIdx, depth + 1))}
+                      </div>
+                    )}
+                  </React.Fragment>
+  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -1112,364 +1545,7 @@ export default function FormBuilder() {
                   </div>
                 </div>
               ) : (
-                fields.map((field, index) => (
-                  <div 
-                    key={field.id} 
-                    className="relative bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start gap-4 hover:border-blue-300 transition-all shadow-xs"
-                  >
-                    {/* Index & Reorder */}
-                    <div className="flex sm:flex-col items-center gap-1">
-                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
-                        {index + 1}
-                      </span>
-                      <div className="flex sm:flex-col gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => moveField(index, 'up')}
-                          disabled={index === 0}
-                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
-                          title="Move Up"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveField(index, 'down')}
-                          disabled={index === fields.length - 1}
-                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
-                          title="Move Down"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Inputs */}
-                    <div className="flex-1 w-full grid grid-cols-1 gap-y-3 gap-x-4 sm:grid-cols-12">
-                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
-                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                          {language === 'mr' ? 'नाव (इंग्रजी / English)' : 'Field Label (English)'}
-                        </label>
-                        <input
-                          type="text"
-                          value={field.labelEn}
-                          onChange={(e) => updateField(field.id, { labelEn: e.target.value })}
-                          className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                          placeholder="e.g., Fever Cases Examined"
-                        />
-                      </div>
-
-                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
-                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                          {language === 'mr' ? 'नाव (मराठी / Marathi)' : 'Field Label (Marathi)'}
-                        </label>
-                        <input
-                          type="text"
-                          value={field.labelMr}
-                          onChange={(e) => updateField(field.id, { labelMr: e.target.value })}
-                          className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                          placeholder="उदा. तपासलेले तापाचे रुग्ण"
-                        />
-                      </div>
-
-                      {reportType !== 'VILLAGE_PROGRESS' && (
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                            {language === 'mr' ? 'प्रकार (Type)' : 'Type'}
-                          </label>
-                          <select
-                            value={field.type}
-                            onChange={(e) => updateField(field.id, { type: e.target.value })}
-                            className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 pl-3 pr-6 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
-                          >
-                            <optgroup label="Text & Inputs">
-                              <option value="Text">Text (मजकूर)</option>
-                              <option value="Long Text">Long Text (सविस्तर मजकूर)</option>
-                              <option value="Number">Number (संख्या)</option>
-                              <option value="Decimal">Decimal (दशांश)</option>
-                              <option value="Mobile Number">Mobile Number (मोबाईल)</option>
-                            </optgroup>
-                            <optgroup label="Date & Time">
-                              <option value="Date">Date (दिनांक)</option>
-                              <option value="Time">Time (वेळ)</option>
-                              <option value="Date & Time">Date & Time (दिनांक आणि वेळ)</option>
-                            </optgroup>
-                            <optgroup label="Choices">
-                              <option value="Dropdown">Dropdown (यादी)</option>
-                              <option value="Radio Button">Radio Button (रेडिओ)</option>
-                              <option value="Checkbox">Checkbox (चेकबॉक्स)</option>
-                              <option value="Yes/No">Yes/No (होय/नाही)</option>
-                            </optgroup>
-                            <optgroup label="Media & Selectors">
-                              <option value="File Upload">File Upload (फाईल)</option>
-                              <option value="Image Upload">Image Upload (चित्र)</option>
-                              <option value="Village Selector">Village Selector (गाव निवड)</option>
-                              <option value="Employee Selector">Employee Selector (कर्मचारी निवड)</option>
-                            </optgroup>
-                            <optgroup label="Advanced">
-                              <option value="Auto Calculated Field">Auto Calculated (स्वयंचलित गणना)</option>
-                              <option value="Read-only Field">Read-only (केवळ वाचनासाठी)</option>
-                            </optgroup>
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Dropdown Options Editor */}
-                      {reportType !== 'VILLAGE_PROGRESS' && ['Dropdown', 'Radio Button', 'Checkbox'].includes(field.type) && (
-                        <div className="sm:col-span-12 mt-1 p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                              {field.type} Options (पर्याय)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => addOption(field.id)}
-                              className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-700"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add Option
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {field.options?.map((option, optIdx) => (
-                              <div key={option.id || optIdx} className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400 w-4 font-bold">{optIdx + 1}.</span>
-                                <input
-                                  type="text"
-                                  placeholder="Option EN (e.g. Normal)"
-                                  value={option.labelEn}
-                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelEn: e.target.value })}
-                                  className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Option MR (उदा. सामान्य)"
-                                  value={option.labelMr}
-                                  onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelMr: e.target.value })}
-                                  className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeOption(field.id, option.id || `${optIdx}`)}
-                                  className="text-slate-400 hover:text-red-500 p-1"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                            {(!field.options || field.options.length === 0) && (
-                              <p className="text-xs text-slate-400 italic">No options added yet.</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="sm:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between mt-2 pt-2 border-t border-slate-100 gap-3">
-                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={field.required}
-                            onChange={(e) => updateField(field.id, { required: e.target.checked })}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
-                          />
-                          <span>{language === 'mr' ? 'अनिवार्य निर्देशक (Required Field *)' : 'Required field *'}</span>
-                        </label>
-                        
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleFieldAdvanced(field.id)}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-800"
-                          >
-                            {expandedFields[field.id] ? '- Hide Advanced' : '+ Show Advanced'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => removeField(field.id)}
-                            className="inline-flex items-center text-xs text-red-600 hover:text-red-700 font-semibold p-1 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1" />
-                            {language === 'mr' ? 'काढून टाका' : 'Remove'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Advanced Settings */}
-                      {expandedFields[field.id] && (
-                        <div className="sm:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 p-4 bg-slate-100/50 rounded-lg border border-slate-200">
-                          {/* Common Options */}
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Placeholder (उदा.)</label>
-                            <input 
-                              type="text" 
-                              value={field.placeholder || ''} 
-                              onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
-                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Help Text / Info</label>
-                            <input 
-                              type="text" 
-                              value={field.help_text || ''} 
-                              onChange={(e) => updateField(field.id, { help_text: e.target.value })}
-                              className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
-                            />
-                          </div>
-
-                          {(field.type === 'Number' || field.type === 'Decimal') && (
-                            <>
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Minimum Value</label>
-                                <input 
-                                  type="number" 
-                                  value={field.min_value || ''} 
-                                  onChange={(e) => updateField(field.id, { min_value: e.target.value })}
-                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Maximum Value</label>
-                                <input 
-                                  type="number" 
-                                  value={field.max_value || ''} 
-                                  onChange={(e) => updateField(field.id, { max_value: e.target.value })}
-                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border" 
-                                />
-                              </div>
-                            </>
-                          )}
-
-                          {/* Conditional Logic UI */}
-                          <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1">
-                            <h4 className="text-xs font-bold text-indigo-700 uppercase mb-2">Conditional Logic (Show IF)</h4>
-                            <div className="flex flex-col sm:flex-row items-center gap-2">
-                              <select
-                                className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
-                                value={field.conditional_logic?.[0]?.dependsOnId || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (!val) {
-                                    updateField(field.id, { conditional_logic: undefined });
-                                  } else {
-                                    updateField(field.id, {
-                                      conditional_logic: [{
-                                        dependsOnId: val,
-                                        operator: field.conditional_logic?.[0]?.operator || '==',
-                                        value: field.conditional_logic?.[0]?.value || ''
-                                      }]
-                                    });
-                                  }
-                                }}
-                              >
-                                <option value="">Always Show (Never Hide)</option>
-                                {fields.filter(f => f.id !== field.id).map(f => (
-                                  <option key={f.id} value={f.id}>{f.labelEn} ({f.type})</option>
-                                ))}
-                              </select>
-
-                              {field.conditional_logic?.[0] && (
-                                <>
-                                  <select
-                                    className="w-full sm:w-1/4 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
-                                    value={field.conditional_logic[0].operator}
-                                    onChange={(e) => updateField(field.id, {
-                                      conditional_logic: [{ ...field.conditional_logic![0], operator: e.target.value as any }]
-                                    })}
-                                  >
-                                    <option value="==">Equals (==)</option>
-                                    <option value="!=">Not Equal (!=)</option>
-                                    <option value=">">Greater Than (&gt;)</option>
-                                    <option value="<">Less Than (&lt;)</option>
-                                  </select>
-                                  <input
-                                    type="text"
-                                    placeholder="Value (e.g. Yes)"
-                                    value={field.conditional_logic[0].value}
-                                    onChange={(e) => updateField(field.id, {
-                                      conditional_logic: [{ ...field.conditional_logic![0], value: e.target.value }]
-                                    })}
-                                    className="w-full sm:w-1/3 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
-                                  />
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Calculation Engine UI */}
-                          {field.type === 'Auto Calculated Field' && (
-                            <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1 bg-amber-50/50 -mx-4 px-4 pb-2 rounded-b-lg">
-                              <h4 className="text-xs font-bold text-amber-700 uppercase mb-2">Calculation Engine Formula</h4>
-                              <p className="text-[10px] text-slate-500 mb-2">
-                                Use field names enclosed in curly braces, e.g., <code>{'{field1}'} + {'{field2}'}</code>.
-                                Operations: +, -, *, /, %
-                              </p>
-                              <div className="space-y-3">
-                                <input
-                                  type="text"
-                                  placeholder="e.g. ({Male_Count} + {Female_Count}) / {Total_Days}"
-                                  value={field.calculation?.formula || ''}
-                                  onChange={(e) => updateField(field.id, {
-                                    calculation: { ...field.calculation, hasCondition: field.calculation?.hasCondition || false, formula: e.target.value }
-                                  })}
-                                  className="w-full sm:text-xs border-slate-300 rounded-md py-1.5 px-2 border font-mono bg-white"
-                                />
-
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={field.calculation?.hasCondition || false}
-                                    onChange={(e) => updateField(field.id, {
-                                      calculation: { formula: field.calculation?.formula || '', hasCondition: e.target.checked }
-                                    })}
-                                    className="h-3.5 w-3.5 text-amber-600 rounded border-slate-300"
-                                  />
-                                  <span>Use IF/ELSE Conditional Logic (e.g. IF Target &gt; 0)</span>
-                                </label>
-
-                                {field.calculation?.hasCondition && (
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white p-2 border border-amber-200 rounded-md">
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">IF Condition</label>
-                                      <input
-                                        type="text"
-                                        placeholder="e.g. {Target} > 0"
-                                        value={field.calculation?.ifCondition || ''}
-                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, ifCondition: e.target.value } })}
-                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">THEN Formula</label>
-                                      <input
-                                        type="text"
-                                        placeholder="e.g. {Achievement} / {Target} * 100"
-                                        value={field.calculation?.thenFormula || ''}
-                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, thenFormula: e.target.value } })}
-                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-bold text-slate-600 mb-1">ELSE Formula</label>
-                                      <input
-                                        type="text"
-                                        placeholder="e.g. 0"
-                                        value={field.calculation?.elseFormula || ''}
-                                        onChange={(e) => updateField(field.id, { calculation: { ...field.calculation!, elseFormula: e.target.value } })}
-                                        className="w-full sm:text-xs border-slate-300 rounded-md py-1 px-2 border font-mono"
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
+                buildFieldTree(fields).map((field, index) => renderFieldNode(field, index))
               )}
             </div>
           </div>
