@@ -136,7 +136,7 @@ export default function Dashboard() {
           }
 
           const { data: allSubmissions } = await subQuery;
-          const subs = allSubmissions || [];
+          const subs: any[] = allSubmissions || [];
 
           // 4. Calculate live metrics
           const submittedCount = subs.filter(s => s.status === 'Submitted' || s.status === 'Approved').length;

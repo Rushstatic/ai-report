@@ -45,7 +45,7 @@ interface FormDefinition {
 interface Village {
   id: string;
   name: string;
-  village_code?: string;
+  code?: string;
 }
 
 export default function ReportSubmission() {
@@ -153,7 +153,7 @@ export default function ReportSubmission() {
         if (employee?.sub_centre_id) {
           const { data: vData } = await (supabase
             .from('villages') as any)
-            .select('id, name, village_code')
+            .select('id, name, code')
             .eq('sub_centre_id', employee.sub_centre_id)
             .order('name');
 
@@ -166,7 +166,7 @@ export default function ReportSubmission() {
           }
         } else {
           // Controller or General user
-          const { data: vData } = await (supabase.from('villages') as any).select('id, name, village_code').limit(20);
+          const { data: vData } = await (supabase.from('villages') as any).select('id, name, code').limit(20);
           if (vData && vData.length > 0) {
             setVillages(vData);
             setSelectedVillageId(vData[0].id);
@@ -467,7 +467,7 @@ export default function ReportSubmission() {
                 >
                   {villages.map(v => (
                     <option key={v.id} value={v.id}>
-                      {v.name} {v.village_code ? `(${v.village_code})` : ''}
+                      {v.name} {v.code ? `(${v.code})` : ''}
                     </option>
                   ))}
                 </select>
