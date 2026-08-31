@@ -7,7 +7,8 @@ import {
   Save, 
   Pencil, 
   ArrowUp, 
-  ArrowDown, 
+  ArrowDown,
+  ArrowLeft, 
   CheckCircle2, 
   AlertCircle, 
   RefreshCw, 
@@ -70,6 +71,7 @@ export default function FormBuilder() {
   const [currentVersion, setCurrentVersion] = useState(1);
   const [parentFormId, setParentFormId] = useState<string | null>(null);
   const [loadingForms, setLoadingForms] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'builder'>('list');
 
   const loadAllForms = async () => {
     setLoadingForms(true);
@@ -86,6 +88,52 @@ export default function FormBuilder() {
   useEffect(() => {
     loadAllForms();
   }, []);
+
+  
+  const handleCreateForm = () => {
+    setLoadedFormId(null);
+    setParentFormId(null);
+    setCurrentVersion(1);
+    setFormName('');
+    setFormDescription('');
+    setFormCode('');
+    setPeriod('Monthly');
+    setReportType('VILLAGE_NUMERICAL');
+    setTargetRole('ALL');
+    setEmployeeWiseSubmission(false);
+    setFields([]);
+    setSaveMode('update');
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setInfoNotice(null);
+    setViewMode('builder');
+  };
+
+  const handleEditForm = async (id: string) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setInfoNotice(null);
+    const fullForm = await getFormWithFields(id);
+    if (!fullForm) return;
+
+    setLoadedFormId(fullForm.id);
+    setParentFormId(fullForm.parent_form_id || fullForm.id);
+    setCurrentVersion(fullForm.version || 1);
+    setFormName(fullForm.name || '');
+    setFormDescription(fullForm.description || '');
+    setFormCode(fullForm.code || '');
+    setPeriod((fullForm.reporting_period as ReportPeriod) || 'Monthly');
+    setReportType((fullForm.report_type as ReportType) || 'VILLAGE_NUMERICAL');
+    setTargetRole(fullForm.target_role || 'ALL');
+    setEmployeeWiseSubmission(fullForm.employee_wise_submission ?? false);
+    setFields(fullForm.fields || []);
+    setViewMode('builder');
+  };
+
+  const handleBackToList = () => {
+    setViewMode('list');
+    loadAllForms();
+  };
 
   const handleSelectForm = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -330,67 +378,6 @@ export default function FormBuilder() {
       }
       return f;
     }));
-  };
-
-  const loadPreset = (presetType: 'maternal' | 'malaria' | 'water' | 'ncd') => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setInfoNotice(null);
-
-    if (presetType === 'maternal') {
-      setFormName('Maternal & Child Health Tracking (माता व बाल आरोग्य नोंद)');
-      setFormDescription('Monthly Antenatal care, institutional deliveries, and infant immunizations.');
-      setPeriod('Monthly');
-      setReportType('VILLAGE_NUMERICAL');
-      setTargetRole('ANM');
-      setEmployeeWiseSubmission(false);
-      setFields([
-        { id: crypto.randomUUID(), labelEn: '1st Trimester ANC Registrations', labelMr: 'पहिल्या तिमाहीत गरोदर माता नोंदणी', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Total High-Risk Pregnancies Identified', labelMr: 'जोखीमयुक्त गरोदर मातांची संख्या', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Institutional Deliveries', labelMr: 'संस्थात्मक प्रसूतींची संख्या', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'PNC Home Visits within 48 Hours', labelMr: '४८ तासांच्या आत प्रसूतीनंतर गृहभेटी', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Fully Immunized Children (0-1 yr)', labelMr: 'पूर्ण लसीकरण झालेली बालके (०-१ वर्ष)', type: 'Number', required: true },
-      ]);
-    } else if (presetType === 'malaria') {
-      setFormName('Vector Borne Disease Surveillance (हिवताप व किटकजन्य रोग साप्ताहिक अहवाल)');
-      setFormDescription('Weekly blood smears, fever tracking, and anti-larval measures.');
-      setPeriod('Weekly');
-      setReportType('VILLAGE_PROGRESS');
-      setTargetRole('MPW');
-      setEmployeeWiseSubmission(true);
-      setFields([
-        { id: crypto.randomUUID(), labelEn: 'Fever Cases Examined', labelMr: 'तपासलेले तापाचे रुग्ण', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Blood Slides Collected (BS)', labelMr: 'घेतलेले रक्त नमुने (BS)', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Malaria Positive Cases (PV/PF)', labelMr: 'मलेरिया बाधित रुग्ण संख्या', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Containers Treated with Abate/Temephos', labelMr: 'अॅबेट वापरलेले पाणी साठे', type: 'Number', required: false },
-      ]);
-    } else if (presetType === 'water') {
-      setFormName('Drinking Water Quality & Chlorination (पिण्याचे पाणी गुणवत्ता व क्लोरीनेशन नोंद)');
-      setFormDescription('Weekly water source inspection and TCL chlorination results.');
-      setPeriod('Weekly');
-      setReportType('VILLAGE_PROGRESS');
-      setTargetRole('MPW');
-      setEmployeeWiseSubmission(true);
-      setFields([
-        { id: crypto.randomUUID(), labelEn: 'Water Sources Inspected', labelMr: 'तपासलेले पाणी स्रोत', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'OT Tests Performed', labelMr: 'केलेल्या ओटी चाचण्या', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Samples with Adequate Chlorine (0.2 ppm+)', labelMr: 'योग्य क्लोरीन आढळलेले नमुने', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Water Storage Tanks Chlorinated', labelMr: 'क्लोरीनेशन केलेल्या पाण्याच्या टाक्या', type: 'Number', required: false },
-      ]);
-    } else if (presetType === 'ncd') {
-      setFormName('Non-Communicable Disease (NCD) Screening (असंसर्गजन्य रोग तपासणी)');
-      setFormDescription('Hypertension, Diabetes, and Oral Cancer screening logs.');
-      setPeriod('Monthly');
-      setReportType('VILLAGE_NUMERICAL');
-      setTargetRole('CHO');
-      setEmployeeWiseSubmission(false);
-      setFields([
-        { id: crypto.randomUUID(), labelEn: 'Individuals Screened for Hypertension (30+ yrs)', labelMr: '३० वर्षांवरील रक्तदाब तपासणी', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Individuals Screened for Diabetes', labelMr: 'मधुमेह (डायबेटीस) तपासणी', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Confirmed Cases on Regular Treatment', labelMr: 'नियमित उपचारावर असलेले रुग्ण', type: 'Number', required: true },
-        { id: crypto.randomUUID(), labelEn: 'Wellness & Yoga Sessions Conducted', labelMr: 'आयोजित योग व आरोग्य सत्रे', type: 'Number', required: false },
-      ]);
-    }
   };
 
   const handleSave = async (isPublishing: boolean = true) => {
@@ -1181,8 +1168,108 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
                   </React.Fragment>
   );
 
+  if (viewMode === 'list') {
+    const periods = ['Daily', 'Weekly', 'Fortnightly', 'Monthly', 'Quarterly', 'Yearly'];
+    return (
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <Layers className="w-6 h-6 text-blue-600" />
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                {language === 'mr' ? 'प्रकाशित प्रपत्रे' : 'Published Forms'}
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              {language === 'mr' ? 'सर्व अहवाल प्रपत्रांचे व्यवस्थापन करा' : 'Manage all health reporting forms'}
+            </p>
+          </div>
+          <button
+            onClick={handleCreateForm}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {language === 'mr' ? 'नवीन प्रपत्र तयार करा' : 'Create New Form'}
+          </button>
+        </div>
+
+        {loadingForms ? (
+          <div className="flex justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {periods.map(period => {
+              const periodForms = existingForms.filter(f => f.reporting_period === period);
+              if (periodForms.length === 0) return null;
+              
+              return (
+                <div key={period} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-500" />
+                      {period} {language === 'mr' ? 'अहवाल' : 'Reports'}
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full ml-2">
+                        {periodForms.length}
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {periodForms.map(form => (
+                      <div key={form.id} className="p-4 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-slate-900">{form.name}</h4>
+                            {form.is_active && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500">{form.description}</p>
+                          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5"/> {form.target_role || 'ALL'}</span>
+                            <span className="flex items-center gap-1"><Pencil className="w-3.5 h-3.5"/> v{form.version || 1}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleEditForm(form.id)}
+                          className="inline-flex items-center px-3 py-1.5 border border-slate-200 shadow-sm text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4 mr-1.5" />
+                          {language === 'mr' ? 'संपादित करा' : 'Edit'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            
+            {existingForms.length === 0 && (
+              <div className="text-center py-12 bg-white border border-slate-200 rounded-xl">
+                <Database className="mx-auto h-12 w-12 text-slate-300" />
+                <h3 className="mt-2 text-sm font-semibold text-slate-900">
+                  {language === 'mr' ? 'कोणतेही प्रपत्र आढळले नाही' : 'No forms found'}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {language === 'mr' ? 'नवीन अहवाल प्रपत्र तयार करण्यासाठी वरील बटणावर क्लिक करा.' : 'Get started by creating a new reporting form.'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      <div className="mb-2">
+        <button onClick={handleBackToList} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium">
+          <ArrowLeft className="w-4 h-4" /> {language === 'mr' ? 'मागे जा' : 'Back to Forms'}
+        </button>
+      </div>
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div>
@@ -1319,46 +1406,6 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
             </div>
           </div>
           <button onClick={() => { setSuccessMsg(null); setInfoNotice(null); }} className="text-emerald-400 hover:text-emerald-600 text-sm font-bold">×</button>
-        </div>
-      )}
-
-      {/* Quick Indicator Presets */}
-      {!isPreviewMode && !loadedFormId && (
-        <div className="bg-blue-50/70 border border-blue-200/70 rounded-xl p-4">
-          <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs uppercase tracking-wider mb-2">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span>{language === 'mr' ? 'मानक आरोग्य प्रपत्र टेम्पलेट्स (Quick Presets)' : 'Standard Health Indicator Presets'}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => loadPreset('maternal')}
-              className="px-3 py-1.5 bg-white hover:bg-blue-100/50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-200 shadow-xs transition-colors"
-            >
-              + Maternal & Child Health (RCH)
-            </button>
-            <button
-              type="button"
-              onClick={() => loadPreset('malaria')}
-              className="px-3 py-1.5 bg-white hover:bg-blue-100/50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-200 shadow-xs transition-colors"
-            >
-              + Malaria & Vector Borne Disease
-            </button>
-            <button
-              type="button"
-              onClick={() => loadPreset('water')}
-              className="px-3 py-1.5 bg-white hover:bg-blue-100/50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-200 shadow-xs transition-colors"
-            >
-              + Water Quality & TCL Chlorination
-            </button>
-            <button
-              type="button"
-              onClick={() => loadPreset('ncd')}
-              className="px-3 py-1.5 bg-white hover:bg-blue-100/50 text-blue-800 text-xs font-semibold rounded-lg border border-blue-200 shadow-xs transition-colors"
-            >
-              + NCD & Screening (CHO)
-            </button>
-          </div>
         </div>
       )}
 

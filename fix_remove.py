@@ -1,25 +1,8 @@
-with open('src/features/forms/FormBuilder.tsx', 'r') as f:
+import re
+with open('src/features/forms/FormBuilder.tsx', 'r', encoding='utf-8') as f:
     content = f.read()
 
-old = """  const removeField = (id: string) => {
-    setFields(fields.filter(f => f.id !== id));
-  };"""
+content = re.sub(r"\{\/\* Quick Indicator Presets \*\/\}.*?\{\/\* Preview Component \*\/\}\s*", "{/* Preview Component */}\n      ", content, flags=re.DOTALL)
 
-new = """  const removeField = (id: string) => {
-    // Collect all descendants to remove
-    const idsToRemove = new Set([id]);
-    let currentIds = [id];
-    
-    while (currentIds.length > 0) {
-      const nextIds = fields.filter(f => currentIds.includes(f.parent_field_id as string)).map(f => f.id);
-      nextIds.forEach(nid => idsToRemove.add(nid));
-      currentIds = nextIds;
-    }
-    
-    setFields(fields.filter(f => !idsToRemove.has(f.id)));
-  };"""
-
-content = content.replace(old, new)
-
-with open('src/features/forms/FormBuilder.tsx', 'w') as f:
+with open('src/features/forms/FormBuilder.tsx', 'w', encoding='utf-8') as f:
     f.write(content)
