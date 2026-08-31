@@ -654,7 +654,11 @@ export default function FormBuilder() {
         supabaseSaved = true;
       } catch (err: any) {
         console.warn('Supabase save warning (fallback to local form storage):', err);
-        supabaseErrorNote = err?.message || 'Supabase database policy requires migration';
+        if (err?.code === '42501') {
+          supabaseErrorNote = 'RLS Permission Denied. You MUST run all pending SQL migrations (especially 00017) in your Supabase dashboard to enable cloud saving.';
+        } else {
+          supabaseErrorNote = err?.message || 'Database schema requires migration';
+        }
       }
     }
 
@@ -674,11 +678,7 @@ export default function FormBuilder() {
           : `Form '${formName}' saved successfully and is active for Data Entry!`
       );
       if (supabaseErrorNote) {
-        setInfoNotice(
-          language === 'mr'
-            ? `टीप: सर्व उपकरणांवर त्वरित सिंक करण्यासाठी Supabase SQL Editor मध्ये मायग्रेशन 00017 चालवा.`
-            : `Note: Live locally in portal. To sync across multi-tenant servers, run migration 00017 in your Supabase SQL Editor.`
-        );
+        setInfoNotice(supabaseErrorNote);
       }
     }
 
