@@ -1772,7 +1772,7 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
               </div>
               <button
                 type="button"
-                onClick={addField}
+                onClick={() => addField()}
                 className="inline-flex items-center px-3.5 py-1.5 border border-transparent text-xs font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-xs transition-colors"
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
@@ -1798,7 +1798,7 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
                   </p>
                   <div className="mt-4">
                     <button
-                      onClick={addField}
+                      onClick={() => addField()}
                       type="button"
                       className="inline-flex items-center px-4 py-2 border border-transparent shadow-xs text-xs font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700"
                     >
