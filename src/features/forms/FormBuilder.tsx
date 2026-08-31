@@ -854,16 +854,17 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
                             {expandedFields[field.id] ? '- Hide Advanced' : '+ Show Advanced'}
                           </button>
 
-                          {field.allow_sub_fields && (
-                            <button
-                              type="button"
-                              onClick={() => addField(field.id)}
-                              className="inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-semibold p-1 hover:bg-blue-50 rounded"
-                            >
-                              <Plus className="h-3.5 w-3.5 mr-1" />
-                              {language === 'mr' ? '+ उप-निर्देशक' : '+ Sub-field'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateField(field.id, { allow_sub_fields: true });
+                              addField(field.id);
+                            }}
+                            className="inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-semibold p-1 hover:bg-blue-50 rounded"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            {language === 'mr' ? '+ उप-निर्देशक' : '+ Sub-field'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => removeField(field.id)}
