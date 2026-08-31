@@ -25,8 +25,8 @@ CREATE POLICY "Enable all access for admins and PHC Controllers" ON public.villa
     USING (
         EXISTS (
             SELECT 1 FROM public.employees e
-            WHERE e.id = auth.uid()
-            AND e.role IN ('STATE_ADMIN', 'DISTRICT_ADMIN', 'TALUKA_ADMIN', 'PHC_CONTROLLER')
+            WHERE e.user_id = auth.uid()
+            AND e.employee_type IN ('DISTRICT_CONTROLLER', 'TALUKA_CONTROLLER', 'PHC_CONTROLLER')
         )
     );
 

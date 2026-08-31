@@ -157,7 +157,7 @@ export default function ReportSubmission() {
         if (employee?.sub_centre_id) {
           const { data: vData } = await (supabase
             .from('villages') as any)
-            .select('id, name, code')
+            .select('id, name, code, population, house_count')
             .eq('sub_centre_id', employee.sub_centre_id)
             .order('name');
 
@@ -223,7 +223,38 @@ export default function ReportSubmission() {
     loadData();
   }, [formId, submissionId, employee]);
 
-    const handleVillageChange = (vId: string) => {
+  
+  // Auto-populate Master Data when village is selected or changed
+  useEffect(() => {
+    if (!form || !form.fields || !villages.length || !selectedVillageId) return;
+
+    const v = villages.find(x => x.id === selectedVillageId);
+    if (v) {
+      let hasChanges = false;
+      const newData = { ...formData };
+      
+      form.fields.forEach(f => {
+        if (f.field_type === 'Master Data Field' && f.master_data_source === 'VILLAGE_MASTER') {
+          let expectedVal: any = '';
+          if (f.master_data_field === 'Population') expectedVal = v.population || 0;
+          if (f.master_data_field === 'House Count') expectedVal = v.house_count || 0;
+          if (f.master_data_field === 'Village Name') expectedVal = v.name;
+          if (f.master_data_field === 'Village Code') expectedVal = v.code || '';
+          
+          if (newData[f.id] !== expectedVal) {
+            newData[f.id] = expectedVal;
+            hasChanges = true;
+          }
+        }
+      });
+      
+      if (hasChanges) {
+        setFormData(newData);
+      }
+    }
+  }, [selectedVillageId, form, villages]);
+
+  const handleVillageChange = (vId: string) => {
     setSelectedVillageId(vId);
     if (!form || !form.fields) return;
     
