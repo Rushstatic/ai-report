@@ -486,13 +486,17 @@ export default function FormBuilder() {
             .update(updatePayload)
             .eq('id', loadedFormId);
 
-          if (updateErr && (updateErr.message?.includes('employee_wise_submission') || updateErr.code === '42703')) {
-            // Retry update without employee_wise_submission column if database schema is awaiting migration
-            delete updatePayload.employee_wise_submission;
-            const retryRes = await (supabase
-              .from('forms') as any)
-              .update(updatePayload)
-              .eq('id', loadedFormId);
+          if (updateErr && updateErr.code === '42703') {
+            console.warn('Database schema missing columns, falling back to basic update', updateErr);
+            const minimalUpdate = {
+              name: formName.trim(),
+              description: formDescription.trim(),
+              reporting_period: period,
+              report_type: reportType,
+              active: isPublishing,
+              updated_at: new Date().toISOString()
+            };
+            const retryRes = await (supabase.from('forms') as any).update(minimalUpdate).eq('id', loadedFormId);
             updateErr = retryRes.error;
           }
 
@@ -518,12 +522,19 @@ export default function FormBuilder() {
             .from('forms') as any)
             .insert(insertPayload);
 
-          if (insertErr && (insertErr.message?.includes('employee_wise_submission') || insertErr.code === '42703')) {
-            // Retry insert without employee_wise_submission column if database schema is awaiting migration
-            delete insertPayload.employee_wise_submission;
-            const retryRes = await (supabase
-              .from('forms') as any)
-              .insert(insertPayload);
+          if (insertErr && insertErr.code === '42703') {
+            // Column missing, fallback to minimal payload
+            console.warn('Database schema missing columns, falling back to basic insert', insertErr);
+            const minimalInsert = {
+              id: targetId,
+              name: formName.trim(),
+              code: finalCode,
+              description: formDescription.trim(),
+              reporting_period: period,
+              report_type: reportType,
+              active: isPublishing
+            };
+            const retryRes = await (supabase.from('forms') as any).insert(minimalInsert);
             insertErr = retryRes.error;
           }
 
@@ -598,10 +609,23 @@ export default function FormBuilder() {
             };
           });
 
-          const { data: insertedFields } = await (supabase
+          let { data: insertedFields, error: fieldInsertErr } = await (supabase
             .from('form_fields') as any)
             .insert(fieldsToInsert)
             .select();
+            
+          if (fieldInsertErr && fieldInsertErr.code === '42703') {
+             console.warn('Database schema missing columns in form_fields, falling back to minimal', fieldInsertErr);
+             const minimalFields = fieldsToInsert.map(f => {
+               const { parent_field_id, allow_sub_fields, master_data_source, master_data_field, master_data_mode, ...rest } = f;
+               return rest;
+             });
+             const retryRes = await (supabase.from('form_fields') as any).insert(minimalFields).select();
+             insertedFields = retryRes.data;
+             fieldInsertErr = retryRes.error;
+          }
+          if (fieldInsertErr) throw fieldInsertErr;
+
 
           // Dropdown options
           const optionsToInsert: any[] = [];
