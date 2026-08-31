@@ -378,8 +378,6 @@ export default function ReportSubmission() {
     }
   };
 
-  if (loading) {
-  
   // Auto-calculation Engine
   useEffect(() => {
     if (!form || !form.fields) return;
@@ -447,7 +445,8 @@ export default function ReportSubmission() {
     }
   }, [formData, form]);
 
-  return (
+  if (loading) {
+    return (
       <div className="flex justify-center items-center h-64 text-slate-500">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
         {language === 'mr' ? 'अहवाल लोड होत आहे...' : 'Loading report form...'}

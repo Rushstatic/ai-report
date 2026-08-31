@@ -486,7 +486,7 @@ export default function FormBuilder() {
             .update(updatePayload)
             .eq('id', loadedFormId);
 
-          if (updateErr && updateErr.code === '42703') {
+          if (updateErr && (updateErr.code === '42703' || (updateErr.message && updateErr.message.includes('schema cache')))) {
             console.warn('Database schema missing columns, falling back to basic update', updateErr);
             const minimalUpdate = {
               name: formName.trim(),
@@ -522,7 +522,7 @@ export default function FormBuilder() {
             .from('forms') as any)
             .insert(insertPayload);
 
-          if (insertErr && insertErr.code === '42703') {
+          if (insertErr && (insertErr.code === '42703' || (insertErr.message && insertErr.message.includes('schema cache')))) {
             // Column missing, fallback to minimal payload
             console.warn('Database schema missing columns, falling back to basic insert', insertErr);
             const minimalInsert = {
@@ -614,7 +614,7 @@ export default function FormBuilder() {
             .insert(fieldsToInsert)
             .select();
             
-          if (fieldInsertErr && fieldInsertErr.code === '42703') {
+          if (fieldInsertErr && (fieldInsertErr.code === '42703' || (fieldInsertErr.message && fieldInsertErr.message.includes('schema cache')))) {
              console.warn('Database schema missing columns in form_fields, falling back to minimal', fieldInsertErr);
              const minimalFields = fieldsToInsert.map(f => {
                const { parent_field_id, allow_sub_fields, master_data_source, master_data_field, master_data_mode, ...rest } = f;
@@ -655,7 +655,7 @@ export default function FormBuilder() {
       } catch (err: any) {
         console.warn('Supabase save warning (fallback to local form storage):', err);
         if (err?.code === '42501') {
-          supabaseErrorNote = 'RLS Permission Denied. You MUST run all pending SQL migrations (especially 00017) in your Supabase dashboard to enable cloud saving.';
+          supabaseErrorNote = 'RLS Permission Denied. Please run the migration file "00021_fix_form_builder_rls.sql" in your Supabase SQL Editor.';
         } else {
           supabaseErrorNote = err?.message || 'Database schema requires migration';
         }

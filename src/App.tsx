@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { isSupabaseConfigured } from './lib/supabase';
 import { useAuth } from './hooks/useAuth';
