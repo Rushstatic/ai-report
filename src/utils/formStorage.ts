@@ -114,7 +114,7 @@ export function deleteLocalForm(formId: string): void {
 /**
  * Loads all active forms by combining database forms, local storage forms, and standard definitions
  */
-export async function fetchAllActiveForms(targetRole?: string): Promise<StoredForm[]> {
+export async function fetchAllActiveForms(targetRole?: string, includeDrafts: boolean = false): Promise<StoredForm[]> {
   const combinedMap = new Map<string, StoredForm>();
 
   // 1. Add standard forms as baseline
@@ -152,11 +152,11 @@ export async function fetchAllActiveForms(targetRole?: string): Promise<StoredFo
   // 2. Fetch from Supabase if configured
   if (isSupabaseConfigured()) {
     try {
-      const { data: dbForms, error } = await (supabase
-        .from('forms') as any)
-        .select('*')
-        .or('active.is.null,active.eq.true')
-        .order('name');
+      let query = (supabase.from('forms') as any).select('*').order('name');
+      if (!includeDrafts) {
+        query = query.or('active.is.null,active.eq.true');
+      }
+      const { data: dbForms, error } = await query;
 
       if (!error && dbForms && dbForms.length > 0) {
         for (const dbf of dbForms) {
@@ -184,7 +184,7 @@ export async function fetchAllActiveForms(targetRole?: string): Promise<StoredFo
   // 3. Merge locally created/published forms (overrides baseline if newer)
   const localForms = getLocalForms();
   for (const lf of localForms) {
-    if (lf.active !== false) {
+    if (includeDrafts || lf.active !== false) {
       combinedMap.set(lf.id, lf);
     }
   }

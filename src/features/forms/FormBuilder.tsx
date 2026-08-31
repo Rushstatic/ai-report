@@ -74,7 +74,7 @@ export default function FormBuilder() {
   const loadAllForms = async () => {
     setLoadingForms(true);
     try {
-      const forms = await fetchAllActiveForms();
+      const forms = await fetchAllActiveForms(undefined, true);
       setExistingForms(forms);
     } catch (err) {
       console.error('Error fetching forms:', err);
@@ -393,7 +393,7 @@ export default function FormBuilder() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (isPublishing: boolean = true) => {
     if (!formName.trim()) {
       setErrorMsg(language === 'mr' ? 'कृपया अहवालाचे नाव प्रविष्ट करा.' : 'Please enter the form name.');
       return;
@@ -451,7 +451,7 @@ export default function FormBuilder() {
       employee_wise_submission: employeeWiseSubmission,
       version: nextVersion,
       parent_form_id: finalParentId,
-      active: true,
+      active: isPublishing,
       fields: fields.map((f, idx) => ({
         ...f,
         id: f.id || crypto.randomUUID(),
@@ -476,7 +476,7 @@ export default function FormBuilder() {
             reporting_period: period,
             report_type: reportType,
             employee_wise_submission: employeeWiseSubmission,
-            active: true,
+            active: isPublishing,
             updated_at: new Date().toISOString()
           };
           if (targetRole) updatePayload.target_role = targetRole;
@@ -508,7 +508,7 @@ export default function FormBuilder() {
             reporting_period: period,
             report_type: reportType,
             employee_wise_submission: employeeWiseSubmission,
-            active: true
+            active: isPublishing
           };
           if (targetRole) insertPayload.target_role = targetRole;
           if (nextVersion) insertPayload.version = nextVersion;
@@ -1206,7 +1206,21 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
 
           <button 
             type="button"
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
+            disabled={isSaving || !formName.trim() || fields.length === 0}
+            className="inline-flex items-center px-4 py-2 border border-slate-300 shadow-xs text-sm font-semibold rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50 transition-colors"
+          >
+            {isSaving ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {language === 'mr' ? 'मसुदा म्हणून जतन करा' : 'Save as Draft'}
+          </button>
+          
+          <button 
+            type="button"
+            onClick={() => handleSave(true)}
             disabled={isSaving || !formName.trim() || fields.length === 0}
             className="inline-flex items-center px-5 py-2 border border-transparent shadow-xs text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
           >
@@ -1220,7 +1234,7 @@ const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0)
                 <Save className="mr-2 h-4 w-4" />
                 {loadedFormId 
                   ? (saveMode === 'update' 
-                      ? (language === 'mr' ? 'बदल जतन करा' : 'Save Changes') 
+                      ? (language === 'mr' ? 'बदल जतन करा' : 'Update & Publish') 
                       : (language === 'mr' ? 'नवीन आवृत्ती प्रकाशित करा' : 'Publish New Version'))
                   : (language === 'mr' ? 'प्रपत्र प्रकाशित करा (Publish)' : 'Publish Form')
                 }
