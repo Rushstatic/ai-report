@@ -277,6 +277,46 @@ export function markSubmissionAsDeleted(submissionId: string): void {
 }
 
 /**
+ * Determines the effective status of a report submission, applying auto-approval rules.
+ */
+export function getEffectiveSubmissionStatus(submission: any): string {
+  if (!submission) return 'Unknown';
+  if (submission.status === 'Approved' || submission.status === 'Rejected') {
+    return submission.status;
+  }
+  
+  if (submission.status === 'Submitted') {
+    const periodType = submission.forms?.reporting_period || submission.reporting_period || '';
+    const periodEndStr = submission.period_end;
+    
+    if (periodEndStr) {
+      const periodEnd = new Date(periodEndStr);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      if (periodType === 'Monthly') {
+        // Monthly: Auto-approved on the 10th of next month (so from 11th onwards).
+        // e.g. if periodEnd is 31st August, next month is September, 11th.
+        const autoApproveDate = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 11);
+        if (today >= autoApproveDate) {
+          return 'Approved';
+        }
+      } else if (['Daily', 'Weekly', 'Fortnightly'].includes(periodType)) {
+        // Auto-approved next day after period_end
+        const autoApproveDate = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate() + 1);
+        if (today >= autoApproveDate) {
+          return 'Approved';
+        }
+      }
+    }
+    
+    return 'Submitted';
+  }
+  
+  return submission.status || 'Pending';
+}
+
+/**
  * Checks whether a submission ID has been marked as deleted.
  */
 export function isSubmissionDeleted(submissionId: string): boolean {
@@ -286,7 +326,49 @@ export function isSubmissionDeleted(submissionId: string): boolean {
 
 /**
  * Filters out all deleted submissions from any array of submission objects.
+ * Also computes and overwrites the submission's status with its effective auto-approved status.
  */
+export function getDefaultPeriodDates(reportingPeriod?: string): { periodStart: string; periodEnd: string } {
+  const now = new Date();
+  
+  if (reportingPeriod === 'Daily') {
+    const today = now.toISOString().split('T')[0];
+    return { periodStart: today, periodEnd: today };
+  } 
+  
+  if (reportingPeriod === 'Weekly') {
+    const day = now.getDay() || 7; 
+    const firstDay = new Date(now);
+    firstDay.setDate(now.getDate() - day + 1);
+    const lastDay = new Date(firstDay);
+    lastDay.setDate(firstDay.getDate() + 6);
+    return { 
+      periodStart: firstDay.toISOString().split('T')[0], 
+      periodEnd: lastDay.toISOString().split('T')[0] 
+    };
+  }
+  
+  if (reportingPeriod === 'Fortnightly') {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const date = now.getDate();
+    if (date <= 15) {
+      const start = new Date(year, month, 1).toISOString().split('T')[0];
+      const end = new Date(year, month, 15).toISOString().split('T')[0];
+      return { periodStart: start, periodEnd: end };
+    } else {
+      const start = new Date(year, month, 16).toISOString().split('T')[0];
+      const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+      return { periodStart: start, periodEnd: end };
+    }
+  }
+
+  // Default to Monthly
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  return { periodStart: firstDay, periodEnd: lastDay };
+}
+
 export function filterOutDeletedSubmissions<T extends { id: string; status?: string }>(submissions: T[]): T[] {
   if (!submissions || !Array.isArray(submissions)) return [];
   const deletedSet = getDeletedSubmissionIds();
@@ -295,7 +377,10 @@ export function filterOutDeletedSubmissions<T extends { id: string; status?: str
     if (sub.status === 'Deleted') return false;
     if (deletedSet.has(sub.id)) return false;
     return true;
-  });
+  }).map(sub => ({
+    ...sub,
+    status: getEffectiveSubmissionStatus(sub)
+  }));
 }
 
 /**

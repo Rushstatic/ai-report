@@ -25,7 +25,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
-import { getFormWithFields, filterOutDeletedSubmissions } from '@/utils/formStorage';
+import { getFormWithFields, filterOutDeletedSubmissions, getEffectiveSubmissionStatus, getDefaultPeriodDates } from '@/utils/formStorage';
 
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No' | 'Auto Calculated Field' | 'Read-only Field' | 'Master Data Field';
 
@@ -86,6 +86,7 @@ export default function ReportSubmission() {
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(submissionId || null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
@@ -96,15 +97,6 @@ export default function ReportSubmission() {
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
-
-  // Set default period (Current month)
-  useEffect(() => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    setPeriodStart(firstDay);
-    setPeriodEnd(lastDay);
-  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -180,6 +172,12 @@ export default function ReportSubmission() {
           fields: mappedFields
         });
 
+        if (!submissionId) {
+          const defaultDates = getDefaultPeriodDates(formObj.reporting_period || 'Monthly');
+          setPeriodStart(defaultDates.periodStart);
+          setPeriodEnd(defaultDates.periodEnd);
+        }
+
         // 2. Fetch live Villages for Employee's Sub-centre
         if (employee?.sub_centre_id) {
           const { data: vData } = await (supabase
@@ -236,6 +234,10 @@ export default function ReportSubmission() {
 
           if (subData) {
             setActiveSubmissionId(subData.id);
+            const effStatus = getEffectiveSubmissionStatus({ ...subData, forms: formObj });
+            if (effStatus === 'Approved') {
+              setIsLocked(true);
+            }
             if (subData.village_id) setSelectedVillageId(subData.village_id);
             if (subData.period_start) setPeriodStart(subData.period_start);
             if (subData.period_end) setPeriodEnd(subData.period_end);
@@ -1338,8 +1340,31 @@ export default function ReportSubmission() {
           </div>
         )}
 
+        {/* Locked Report Banner */}
+        {isLocked && (
+          <div className="m-6 p-5 bg-red-50 border-2 border-red-200 rounded-xl space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-100 border border-red-200 text-red-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-950">
+                  {language === 'mr' 
+                    ? 'हा अहवाल मंजूर झाला आहे आणि लॉक केला आहे.' 
+                    : 'This report is approved and completely locked.'}
+                </h3>
+                <p className="text-xs text-red-800 mt-1">
+                  {language === 'mr'
+                    ? 'मंजूर झालेले अहवाल बदलता किंवा हटवता येत नाहीत.'
+                    : 'Approved reports cannot be edited or deleted by any user.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Subcentre Level Form Already Submitted Banner */}
-        {isSubCentreLevelAlreadySubmitted && (
+        {isSubCentreLevelAlreadySubmitted && !isLocked && (
           <div className="m-6 p-5 bg-amber-50 border-2 border-amber-200 rounded-xl space-y-3">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -1391,37 +1416,41 @@ export default function ReportSubmission() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => saveReport('Draft')}
-              disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
-              className="inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Save className="mr-2 h-4 w-4 text-slate-500" />
-              {language === 'mr' ? 'मसुदा जतन करा (Save Draft)' : 'Save Draft'}
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => saveReport('Submitted')}
-              disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
-              className="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-xs transition-colors cursor-pointer"
-            >
-              {submitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : isEditMode ? (
-                <Save className="mr-2 h-4 w-4" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              {submitting 
-                ? (language === 'mr' ? 'Supabase मध्ये जतन होत आहे...' : 'Saving to Supabase...')
-                : (isEditMode 
-                    ? (language === 'mr' ? 'दुरुस्त अहवाल सादर करा (Update Report)' : 'Update Report') 
-                    : (language === 'mr' ? 'अहवाल सादर करा (Submit Report)' : 'Submit Report')
-                  )
-              }
-            </button>
+            {!isLocked && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => saveReport('Draft')}
+                  disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
+                  className="inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  <Save className="mr-2 h-4 w-4 text-slate-500" />
+                  {language === 'mr' ? 'मसुदा जतन करा (Save Draft)' : 'Save Draft'}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => saveReport('Submitted')}
+                  disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
+                  className="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-xs transition-colors cursor-pointer"
+                >
+                  {submitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : isEditMode ? (
+                    <Save className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  {submitting 
+                    ? (language === 'mr' ? 'Supabase मध्ये जतन होत आहे...' : 'Saving to Supabase...')
+                    : (isEditMode 
+                        ? (language === 'mr' ? 'दुरुस्त अहवाल सादर करा (Update Report)' : 'Update Report') 
+                        : (language === 'mr' ? 'अहवाल सादर करा (Submit Report)' : 'Submit Report')
+                      )
+                  }
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

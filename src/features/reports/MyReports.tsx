@@ -422,7 +422,7 @@ export default function MyReports() {
                               </button>
                             )}
 
-                            {(isOwnSubmission || isController) && (
+                            {(isOwnSubmission || isController) && report.status !== 'Approved' && (
                               <button 
                                 onClick={() => setReportToDelete(report)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-colors ml-1 cursor-pointer"

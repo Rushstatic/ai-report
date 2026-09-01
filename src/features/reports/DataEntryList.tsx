@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
-import { fetchAllActiveForms, filterOutDeletedSubmissions } from '@/utils/formStorage';
+import { fetchAllActiveForms, filterOutDeletedSubmissions, getDefaultPeriodDates } from '@/utils/formStorage';
 
 interface FormItem {
   id: string;
@@ -111,10 +111,11 @@ export default function DataEntryList() {
   const getFormStatus = (form: FormItem) => {
     const isListType = form.report_type === 'LIST';
     const isSubCentreLevel = form.report_type === 'SUBCENTRE_LEVEL';
+    const { periodStart } = getDefaultPeriodDates(form.reporting_period);
 
     if (form.employee_wise_submission) {
-      // Employee-wise: Check submissions by this specific employee
-      const mySubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.employee_id === employee?.id);
+      // Employee-wise: Check submissions by this specific employee for the current period
+      const mySubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.employee_id === employee?.id && s.period_start === periodStart);
       const submittedVillageIds = new Set(mySubs.map(s => s.village_id).filter(Boolean));
       const totalVillages = villages.length;
       const submittedCount = submittedVillageIds.size;
@@ -131,8 +132,8 @@ export default function DataEntryList() {
         record: mySubs[0]
       };
     } else {
-      // Sub-centre level or regular village-wise: Check submissions by any staff member in sub-centre
-      const subCentreSubs = submissions.filter(s => s.form_id === form.id || s.form_id === form.code);
+      // Sub-centre level or regular village-wise: Check submissions by any staff member in sub-centre for the current period
+      const subCentreSubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.period_start === periodStart);
       const submittedVillageIds = new Set(subCentreSubs.map(s => s.village_id).filter(Boolean));
       const totalVillages = villages.length;
       const submittedCount = submittedVillageIds.size;
