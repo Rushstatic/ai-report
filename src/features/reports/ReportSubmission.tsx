@@ -36,6 +36,7 @@ interface FormField {
   label_mr: string;
   field_type: FieldType | string;
   is_required: boolean;
+  allow_sub_fields?: boolean;
   options?: { id: string; label_en: string; label_mr: string; value: string }[];
   master_data_source?: string;
   master_data_field?: string;
@@ -157,6 +158,7 @@ export default function ReportSubmission() {
           label_mr: f.labelMr || f.label_mr || f.name,
           field_type: (f.type || f.field_type || 'Text') as FieldType,
           is_required: f.required !== undefined ? !!f.required : !!f.is_required,
+          allow_sub_fields: !!(f.allow_sub_fields || f.allowSubFields || f.type === 'Group Header' || f.field_type === 'Group Header'),
           parent_field_id: f.parent_field_id || f.parentFieldId || null,
           options: (f.options || []).map((o: any) => ({
             id: o.id || o.value,
@@ -457,22 +459,29 @@ export default function ReportSubmission() {
         setActiveSubmissionId(newSub.id);
       }
 
-      // Insert field values into report_submission_values table
+      // Insert field values into report_submission_values table (excluding pure Group Headers)
       if (subId && form.fields && form.fields.length > 0) {
-        const valuesToInsert = form.fields.map(f => {
+        const leafFields = form.fields.filter(f => {
+          const isGroup = f.allow_sub_fields || f.field_type === 'Group Header';
+          return !isGroup;
+        });
+
+        const valuesToInsert = leafFields.map(f => {
           const rawVal = formData[f.id];
           return {
             submission_id: subId,
             field_id: f.id,
             value_text: typeof rawVal === 'string' ? rawVal : (rawVal !== undefined && rawVal !== null ? String(rawVal) : null),
-            value_numeric: f.field_type === 'Number' && rawVal !== undefined && rawVal !== '' ? Number(rawVal) : null,
+            value_numeric: (f.field_type === 'Number' || f.field_type === 'Decimal') && rawVal !== undefined && rawVal !== '' ? Number(rawVal) : null,
             value_boolean: f.field_type === 'Yes/No' ? rawVal === 'yes' : null,
-            value_date: f.field_type === 'Date' && rawVal ? rawVal : null
+            value_date: (f.field_type === 'Date' || f.field_type === 'Date & Time') && rawVal ? rawVal : null
           };
         });
 
-        const { error: valsErr } = await (supabase.from('report_submission_values') as any).insert(valuesToInsert);
-        if (valsErr) throw valsErr;
+        if (valuesToInsert.length > 0) {
+          const { error: valsErr } = await (supabase.from('report_submission_values') as any).insert(valuesToInsert);
+          if (valsErr) throw valsErr;
+        }
       }
 
       const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -557,7 +566,8 @@ export default function ReportSubmission() {
     // Validate required fields if submitting
     if (status === 'Submitted') {
       for (const field of form.fields) {
-        if (field.is_required && (formData[field.id] === undefined || formData[field.id] === '')) {
+        const isGroup = field.allow_sub_fields || field.field_type === 'Group Header';
+        if (!isGroup && field.is_required && (formData[field.id] === undefined || formData[field.id] === '')) {
           setError(`Please fill in required field: ${language === 'mr' ? field.label_mr : field.label_en}`);
           return;
         }
@@ -681,8 +691,9 @@ export default function ReportSubmission() {
 
   const renderReportFieldNode = (field: FormField, depth: number = 0, subIndex?: string): React.ReactNode => {
     const hasChildren = field.children && field.children.length > 0;
+    const isGroupHeader = field.allow_sub_fields || field.field_type === 'Group Header' || hasChildren;
 
-    if (hasChildren) {
+    if (isGroupHeader) {
       return (
         <div 
           key={field.id} 
@@ -705,9 +716,15 @@ export default function ReportSubmission() {
                     ({language === 'mr' ? field.label_en : field.label_mr})
                   </span>
                 </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  {language === 'mr' ? 'खालील सर्व उप-प्रश्नांची माहिती भरा' : 'Fill all nested subfield indicators below'}
-                </p>
+                {hasChildren ? (
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {language === 'mr' ? 'खालील सर्व उप-प्रश्नांची माहिती भरा' : 'Fill all nested subfield indicators below'}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {language === 'mr' ? 'विभागाचे मुख्य शीर्षक (गट)' : 'Main Category Section Header'}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -715,25 +732,29 @@ export default function ReportSubmission() {
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                 📁 {language === 'mr' ? 'मुख्य गट' : 'Group Header'}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
-                {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
-              </span>
+              {hasChildren && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                  {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Shaded Content Container with isolated child cards */}
-          <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
-            <div className="grid grid-cols-1 gap-3.5">
-              {field.children!.map((child, childIdx) => (
-                <div 
-                  key={child.id} 
-                  className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs hover:border-blue-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all"
-                >
-                  {renderReportFieldNode(child, depth + 1, `${childIdx + 1}`)}
-                </div>
-              ))}
+          {hasChildren && (
+            <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
+              <div className="grid grid-cols-1 gap-3.5">
+                {field.children!.map((child, childIdx) => (
+                  <div 
+                    key={child.id} 
+                    className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs hover:border-blue-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all"
+                  >
+                    {renderReportFieldNode(child, depth + 1, `${childIdx + 1}`)}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       );
     }

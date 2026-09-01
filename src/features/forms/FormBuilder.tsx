@@ -722,8 +722,9 @@ export default function FormBuilder() {
 
   const renderPreviewFieldNode = (field: FormFieldItem, depth: number = 0, subIndex?: string): React.ReactNode => {
     const hasChildren = field.children && field.children.length > 0;
+    const isGroupHeader = field.allow_sub_fields || field.type === 'Group Header' || hasChildren;
 
-    if (hasChildren) {
+    if (isGroupHeader) {
       return (
         <div key={field.id} className={`my-5 border-2 rounded-xl overflow-hidden shadow-xs transition-all ${depth > 0 ? 'ml-2 sm:ml-6 border-indigo-200 bg-indigo-50/20' : 'border-blue-200/90 bg-slate-50/50'}`}>
           <div className="bg-gradient-to-r from-slate-100 via-slate-100 to-blue-50/60 px-4 py-3.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -744,20 +745,24 @@ export default function FormBuilder() {
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                 📁 {language === 'mr' ? 'मुख्य गट' : 'Group Header'}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
-                {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
-              </span>
+              {hasChildren && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                  {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
+                </span>
+              )}
             </div>
           </div>
-          <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
-            <div className="grid grid-cols-1 gap-3">
-              {field.children!.map((child, childIdx) => (
-                <div key={child.id} className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
-                  {renderPreviewFieldNode(child, depth + 1, `${childIdx + 1}`)}
-                </div>
-              ))}
+          {hasChildren && (
+            <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
+              <div className="grid grid-cols-1 gap-3">
+                {field.children!.map((child, childIdx) => (
+                  <div key={child.id} className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
+                    {renderPreviewFieldNode(child, depth + 1, `${childIdx + 1}`)}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       );
     }
