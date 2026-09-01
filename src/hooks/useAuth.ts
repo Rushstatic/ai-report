@@ -124,11 +124,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (!error && data.session) {
       const isDefault = pass === '123456';
       set({ needsPasswordChange: isDefault, session: data.session, user: data.session.user });
-      if (isDefault) {
-        localStorage.setItem('needsPasswordChange', 'true');
-      } else {
-        localStorage.removeItem('needsPasswordChange');
-      }
 
       // Immediately resolve employee
       const emp = await resolveEmployeeRecord(data.session.user.id, formattedPhone);
@@ -145,7 +140,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     
     if (!error) {
       set({ needsPasswordChange: false });
-      localStorage.removeItem('needsPasswordChange');
     }
     
     set({ loading: false, error: error?.message || null });
@@ -157,7 +151,6 @@ export const useAuth = create<AuthState>((set, get) => ({
     
     set({ loading: true });
     await supabase.auth.signOut();
-    localStorage.removeItem('needsPasswordChange');
     set({ session: null, user: null, employee: null, loading: false, needsPasswordChange: false });
   },
 
@@ -166,9 +159,6 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ initialized: true });
       return;
     }
-
-    const needsPasswordChange = localStorage.getItem('needsPasswordChange') === 'true';
-    set({ needsPasswordChange });
 
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {

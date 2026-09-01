@@ -28,7 +28,6 @@ import { useLanguageStore } from '@/store/languageStore';
 import { 
   fetchAllActiveForms, 
   getFormWithFields, 
-  saveLocalForm, 
   deleteFormCompletely,
   StoredForm, 
   FormFieldItem, 
@@ -480,15 +479,17 @@ export default function FormBuilder() {
       }))
     };
 
-    // 1. Save to local storage first (Ensures immediate usability in Data Entry)
-    saveLocalForm(storedFormObject);
-
-    // 2. Attempt saving to Supabase if configured
+    // Save directly to Supabase Online Cloud Database
     let supabaseSaved = false;
     let supabaseErrorNote = '';
 
-    if (isSupabaseConfigured()) {
-      try {
+    if (!isSupabaseConfigured()) {
+      setErrorMsg(language === 'mr' ? 'डेटाबेस कनेक्ट केलेला नाही.' : 'Supabase database is not connected.');
+      setIsSaving(false);
+      return;
+    }
+
+    try {
         if (loadedFormId && saveMode === 'update') {
           // Update Form row
           const updatePayload: any = {
@@ -674,14 +675,13 @@ export default function FormBuilder() {
 
         supabaseSaved = true;
       } catch (err: any) {
-        console.warn('Supabase save warning (fallback to local form storage):', err);
+        console.error('Supabase save error:', err);
         if (err?.code === '42501') {
           supabaseErrorNote = 'RLS Permission Denied. Please run the migration file "00021_fix_form_builder_rls.sql" in your Supabase SQL Editor.';
         } else {
-          supabaseErrorNote = err?.message || 'Database schema requires migration';
+          supabaseErrorNote = err?.message || 'Database error occurred';
         }
       }
-    }
 
     setLoadedFormId(targetId);
     setFormCode(finalCode);
@@ -693,14 +693,9 @@ export default function FormBuilder() {
           : `Form '${formName}' successfully published to Supabase and is live for field reporting!`
       );
     } else {
-      setSuccessMsg(
-        language === 'mr' 
-          ? `अहवाल प्रपत्र '${formName}' जतन झाले असून "Data Entry" मध्ये सक्रिय आहे!` 
-          : `Form '${formName}' saved successfully and is active for Data Entry!`
+      setErrorMsg(
+        supabaseErrorNote || (language === 'mr' ? 'फॉर्म जतन करताना त्रुटी आली.' : 'Failed to save form to online database.')
       );
-      if (supabaseErrorNote) {
-        setInfoNotice(supabaseErrorNote);
-      }
     }
 
     await loadAllForms();
