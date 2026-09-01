@@ -775,22 +775,44 @@ export default function FormBuilder() {
             ({language === 'mr' ? field.labelEn : field.labelMr})
           </span>
           {field.required && <span className="text-red-500 ml-1 font-bold">*</span>}
+          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+            {field.type || 'Number'}
+          </span>
         </label>
         
-        {field.type === 'Text' && (
+        {(field.type === 'Text' || !field.type) && (
           <input
             type="text"
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
-            placeholder="Enter text..."
+            placeholder={field.placeholder || "Enter text..."}
+            disabled
+          />
+        )}
+
+        {field.type === 'Long Text' && (
+          <textarea
+            rows={2}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
+            placeholder={field.placeholder || "Enter detailed text..."}
             disabled
           />
         )}
           
-        {field.type === 'Number' && (
+        {(field.type === 'Number' || field.type === 'Decimal') && (
           <input
             type="number"
+            step={field.type === 'Decimal' ? '0.01' : '1'}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
-            placeholder="0"
+            placeholder={field.placeholder || "0"}
+            disabled
+          />
+        )}
+
+        {field.type === 'Mobile Number' && (
+          <input
+            type="tel"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
+            placeholder={field.placeholder || "10-digit mobile number"}
             disabled
           />
         )}
@@ -802,17 +824,69 @@ export default function FormBuilder() {
             disabled
           />
         )}
+
+        {field.type === 'Time' && (
+          <input
+            type="time"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500"
+            disabled
+          />
+        )}
+
+        {field.type === 'Date & Time' && (
+          <input
+            type="datetime-local"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500"
+            disabled
+          />
+        )}
           
         {field.type === 'Yes/No' && (
           <div className="flex items-center gap-6 mt-1 text-sm text-slate-600">
             <label className="flex items-center gap-2">
-              <input type="radio" name={field.id} disabled />
-              <span>Yes (होय)</span>
+              <input type="radio" name={`preview_${field.id}`} disabled />
+              <span>{language === 'mr' ? 'होय (Yes)' : 'Yes (होय)'}</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="radio" name={field.id} disabled />
-              <span>No (नाही)</span>
+              <input type="radio" name={`preview_${field.id}`} disabled />
+              <span>{language === 'mr' ? 'नाही (No)' : 'No (नाही)'}</span>
             </label>
+          </div>
+        )}
+
+        {field.type === 'Radio Button' && (
+          <div className="flex flex-wrap gap-4 mt-1.5">
+            {field.options && field.options.length > 0 ? (
+              field.options.map((opt, i) => (
+                <label key={i} className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <input type="radio" name={`preview_radio_${field.id}`} disabled />
+                  <span>{language === 'mr' ? opt.labelMr || opt.labelEn : opt.labelEn || opt.labelMr}</span>
+                </label>
+              ))
+            ) : (
+              <div className="flex items-center gap-3 text-xs text-slate-400 italic">
+                <label className="flex items-center gap-1.5"><input type="radio" disabled /> <span>Option 1 (पर्याय १)</span></label>
+                <label className="flex items-center gap-1.5"><input type="radio" disabled /> <span>Option 2 (पर्याय २)</span></label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {field.type === 'Checkbox' && (
+          <div className="flex flex-wrap gap-4 mt-1.5">
+            {field.options && field.options.length > 0 ? (
+              field.options.map((opt, i) => (
+                <label key={i} className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <input type="checkbox" disabled />
+                  <span>{language === 'mr' ? opt.labelMr || opt.labelEn : opt.labelEn || opt.labelMr}</span>
+                </label>
+              ))
+            ) : (
+              <div className="flex items-center gap-3 text-xs text-slate-400 italic">
+                <label className="flex items-center gap-1.5"><input type="checkbox" disabled /> <span>Choice A (पर्याय अ)</span></label>
+                <label className="flex items-center gap-1.5"><input type="checkbox" disabled /> <span>Choice B (पर्याय ब)</span></label>
+              </div>
+            )}
           </div>
         )}
           
@@ -823,6 +897,30 @@ export default function FormBuilder() {
               <option key={i}>{language === 'mr' ? opt.labelMr || opt.labelEn : opt.labelEn}</option>
             ))}
           </select>
+        )}
+
+        {(field.type === 'File Upload' || field.type === 'Image Upload') && (
+          <div className="border-2 border-dashed border-slate-200 rounded-lg p-3 bg-slate-50 text-center text-xs text-slate-400">
+            {field.type === 'Image Upload' ? '📷 Image Upload Preview (चित्र अपलोड)' : '📎 File Upload Preview (दस्तऐवज फाईल अपलोड)'}
+          </div>
+        )}
+
+        {field.type === 'Village Selector' && (
+          <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500" disabled>
+            <option>-- {language === 'mr' ? 'गाव निवडा (Select Village)' : 'Select Village'} --</option>
+          </select>
+        )}
+
+        {field.type === 'Employee Selector' && (
+          <select className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-500" disabled>
+            <option>-- {language === 'mr' ? 'कर्मचारी निवडा (Select Employee)' : 'Select Employee'} --</option>
+          </select>
+        )}
+
+        {(field.type === 'Auto Calculated Field' || field.type === 'Master Data Field' || field.type === 'Read-only Field') && (
+          <div className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-500 italic">
+            {field.type === 'Auto Calculated Field' ? '🧮 [Auto Calculated Result]' : field.type === 'Master Data Field' ? '📊 [Master Data Auto-populated]' : '🔒 [Read-only Value]'}
+          </div>
         )}
       </div>
     );
@@ -881,7 +979,7 @@ export default function FormBuilder() {
 
                     {/* Inputs */}
                     <div className="flex-1 w-full grid grid-cols-1 gap-y-3 gap-x-4 sm:grid-cols-12">
-                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
+                      <div className="sm:col-span-4">
                         <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                           {language === 'mr' ? 'नाव (इंग्रजी / English)' : 'Field Label (English)'}
                         </label>
@@ -890,11 +988,11 @@ export default function FormBuilder() {
                           value={field.labelEn}
                           onChange={(e) => updateField(field.id, { labelEn: e.target.value })}
                           className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                          placeholder="e.g., Fever Cases Examined"
+                          placeholder="e.g., Examination Date / Fever Cases"
                         />
                       </div>
 
-                      <div className={reportType === 'VILLAGE_PROGRESS' ? "sm:col-span-6" : "sm:col-span-5"}>
+                      <div className="sm:col-span-4">
                         <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                           {language === 'mr' ? 'नाव (मराठी / Marathi)' : 'Field Label (Marathi)'}
                         </label>
@@ -903,60 +1001,59 @@ export default function FormBuilder() {
                           value={field.labelMr}
                           onChange={(e) => updateField(field.id, { labelMr: e.target.value })}
                           className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 px-3 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                          placeholder="उदा. तपासलेले तापाचे रुग्ण"
+                          placeholder="उदा. तपासणी दिनांक / तापाचे रुग्ण"
                         />
                       </div>
 
-                      {reportType !== 'VILLAGE_PROGRESS' && (
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                            {language === 'mr' ? 'प्रकार (Type)' : 'Type'}
-                          </label>
-                          <select
-                            value={field.allow_sub_fields ? 'Group Header' : field.type}
-                            onChange={(e) => updateField(field.id, { type: e.target.value })}
-                            disabled={field.allow_sub_fields}
-                            className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 pl-3 pr-6 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium disabled:bg-slate-100 disabled:text-slate-500"
-                          >
-                            {field.allow_sub_fields && <option value="Group Header">Group Header</option>}
-                            <optgroup label="Text & Inputs">
-                              <option value="Text">Text (मजकूर)</option>
-                              <option value="Long Text">Long Text (सविस्तर मजकूर)</option>
-                              <option value="Number">Number (संख्या)</option>
-                              <option value="Decimal">Decimal (दशांश)</option>
-                              <option value="Mobile Number">Mobile Number (मोबाईल)</option>
-                            </optgroup>
-                            <optgroup label="Date & Time">
-                              <option value="Date">Date (दिनांक)</option>
-                              <option value="Time">Time (वेळ)</option>
-                              <option value="Date & Time">Date & Time (दिनांक आणि वेळ)</option>
-                            </optgroup>
-                            <optgroup label="Choices">
-                              <option value="Dropdown">Dropdown (यादी)</option>
-                              <option value="Radio Button">Radio Button (रेडिओ)</option>
-                              <option value="Checkbox">Checkbox (चेकबॉक्स)</option>
-                              <option value="Yes/No">Yes/No (होय/नाही)</option>
-                            </optgroup>
-                            <optgroup label="Media & Selectors">
-                              <option value="File Upload">File Upload (फाईल)</option>
-                              <option value="Image Upload">Image Upload (चित्र)</option>
-                              <option value="Village Selector">Village Selector (गाव निवड)</option>
-                              <option value="Employee Selector">Employee Selector (कर्मचारी निवड)</option>
-                            </optgroup>
-                            <optgroup label="Advanced">
-                              <option value="Auto Calculated Field">Auto Calculated (स्वयंचलित गणना)</option>
-                              <option value="Read-only Field">Read-only (केवळ वाचनासाठी)</option>
-                            </optgroup>
-                          </select>
-                        </div>
-                      )}
+                      <div className="sm:col-span-4">
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          {language === 'mr' ? 'प्रकार (Field Type)' : 'Field Type'}
+                        </label>
+                        <select
+                          value={field.allow_sub_fields ? 'Group Header' : (field.type || 'Number')}
+                          onChange={(e) => updateField(field.id, { type: e.target.value })}
+                          disabled={field.allow_sub_fields}
+                          className="w-full sm:text-sm border-slate-300 rounded-lg py-1.5 pl-3 pr-6 border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium disabled:bg-slate-100 disabled:text-slate-500"
+                        >
+                          {field.allow_sub_fields && <option value="Group Header">📁 Group Header (मुख्य गट)</option>}
+                          <optgroup label="Text & Numbers (मजकूर व संख्या)">
+                            <option value="Number">🔢 Number (संख्या / मोजणी)</option>
+                            <option value="Decimal">🔢 Decimal (दशांश संख्या)</option>
+                            <option value="Text">📝 Text (मजकूर / Text)</option>
+                            <option value="Long Text">📄 Long Text (सविस्तर मजकूर / शेरा)</option>
+                            <option value="Mobile Number">📱 Mobile Number (मोबाईल क्र.)</option>
+                          </optgroup>
+                          <optgroup label="Date & Time (दिनांक व वेळ)">
+                            <option value="Date">📅 Date (दिनांक / तारीख)</option>
+                            <option value="Time">⏰ Time (वेळ)</option>
+                            <option value="Date & Time">🗓️ Date & Time (दिनांक आणि वेळ)</option>
+                          </optgroup>
+                          <optgroup label="Choices & Options (पर्याय / Choice)">
+                            <option value="Radio Button">🔘 Radio Button (एक पर्याय / Single Choice)</option>
+                            <option value="Checkbox">☑️ Checkbox (अनेक पर्याय / Multiple Choice)</option>
+                            <option value="Dropdown">📋 Dropdown (ड्रॉपडाउन यादी)</option>
+                            <option value="Yes/No">⚖️ Yes/No (होय / नाही)</option>
+                          </optgroup>
+                          <optgroup label="Selectors & Media (निवड व अपलोड)">
+                            <option value="Village Selector">🏘️ Village Selector (गाव निवड)</option>
+                            <option value="Employee Selector">👨‍⚕️ Employee Selector (कर्मचारी निवड)</option>
+                            <option value="File Upload">📎 File Upload (दस्तऐवज फाईल)</option>
+                            <option value="Image Upload">📷 Image Upload (फोटो / चित्र)</option>
+                          </optgroup>
+                          <optgroup label="Advanced (प्रगत निर्देशक)">
+                            <option value="Auto Calculated Field">🧮 Auto Calculated (स्वयंचलित गणना)</option>
+                            <option value="Master Data Field">📊 Master Data (मास्टर डेटा)</option>
+                            <option value="Read-only Field">🔒 Read-only (केवळ वाचनासाठी)</option>
+                          </optgroup>
+                        </select>
+                      </div>
 
-                      {/* Dropdown Options Editor */}
-                      {reportType !== 'VILLAGE_PROGRESS' && ['Dropdown', 'Radio Button', 'Checkbox'].includes(field.type) && (
+                      {/* Dropdown / Radio / Checkbox Options Editor */}
+                      {['Dropdown', 'Radio Button', 'Checkbox'].includes(field.type) && (
                         <div className="sm:col-span-12 mt-1 p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                              {field.type} Options (पर्याय)
+                              {field.type === 'Radio Button' ? '🔘 Radio Button Options (रेडिओ पर्याय)' : field.type === 'Checkbox' ? '☑️ Checkbox Multiple Choices (चेकबॉक्स पर्याय)' : '📋 Dropdown Options (यादी पर्याय)'}
                             </span>
                             <button
                               type="button"
@@ -973,14 +1070,14 @@ export default function FormBuilder() {
                                 <span className="text-xs text-slate-400 w-4 font-bold">{optIdx + 1}.</span>
                                 <input
                                   type="text"
-                                  placeholder="Option EN (e.g. Normal)"
+                                  placeholder="Option EN (e.g. Normal / Positive)"
                                   value={option.labelEn}
                                   onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelEn: e.target.value })}
                                   className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Option MR (उदा. सामान्य)"
+                                  placeholder="Option MR (उदा. सामान्य / पॉझिटिव्ह)"
                                   value={option.labelMr}
                                   onChange={(e) => updateOption(field.id, option.id || `${optIdx}`, { labelMr: e.target.value })}
                                   className="flex-1 sm:text-xs border-slate-300 rounded-md py-1 px-2 border"
@@ -988,14 +1085,23 @@ export default function FormBuilder() {
                                 <button
                                   type="button"
                                   onClick={() => removeOption(field.id, option.id || `${optIdx}`)}
-                                  className="text-slate-400 hover:text-red-500 p-1"
+                                  className="text-slate-400 hover:text-red-500 p-1 cursor-pointer"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             ))}
                             {(!field.options || field.options.length === 0) && (
-                              <p className="text-xs text-slate-400 italic">No options added yet.</p>
+                              <div className="flex items-center justify-between py-2 text-xs text-amber-700 bg-amber-50 px-3 rounded-md border border-amber-200">
+                                <span>{language === 'mr' ? 'अद्याप कोणतेही पर्याय जोडलेले नाहीत. कृपया "Add Option" वर क्लिक करा.' : 'No options added yet. Click "+ Add Option" above to add choices.'}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => addOption(field.id)}
+                                  className="underline font-bold"
+                                >
+                                  + Add Option
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1685,19 +1791,35 @@ export default function FormBuilder() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-slate-200">
-                    {fields.map((field) => (
-                      <tr key={field.id}>
-                        <td className="px-3 py-3 font-semibold text-slate-800">
-                          {field.labelEn || 'Untitled Field'}
-                          {field.labelMr && <div className="text-xs text-slate-500 font-normal">{field.labelMr}</div>}
-                          {field.required && <span className="text-red-500 ml-1 font-bold">*</span>}
-                        </td>
-                        <td className="px-3 py-3"><input type="number" placeholder="100" className="w-20 border border-slate-300 rounded px-2 py-1 bg-slate-50" disabled /></td>
-                        <td className="px-3 py-3"><input type="number" placeholder="85" className="w-20 border border-slate-300 rounded px-2 py-1 bg-slate-50" disabled /></td>
-                        <td className="px-3 py-3 font-bold text-orange-600">15</td>
-                        <td className="px-3 py-3 font-bold text-emerald-600">85%</td>
-                      </tr>
-                    ))}
+                    {fields.map((field) => {
+                      const isNumerical = !field.type || field.type === 'Number' || field.type === 'Decimal' || field.type === 'Auto Calculated Field';
+                      return (
+                        <tr key={field.id} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-3 font-semibold text-slate-800">
+                            <div className="flex items-center gap-1.5">
+                              <span>{field.labelEn || 'Untitled Field'}</span>
+                              {field.required && <span className="text-red-500 font-bold">*</span>}
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                {field.type || 'Number'}
+                              </span>
+                            </div>
+                            {field.labelMr && <div className="text-xs text-slate-500 font-normal mt-0.5">{field.labelMr}</div>}
+                          </td>
+                          {isNumerical ? (
+                            <>
+                              <td className="px-3 py-3"><input type="number" placeholder="100" className="w-20 border border-slate-300 rounded px-2 py-1 bg-slate-50" disabled /></td>
+                              <td className="px-3 py-3"><input type="number" placeholder="85" className="w-20 border border-slate-300 rounded px-2 py-1 bg-slate-50" disabled /></td>
+                              <td className="px-3 py-3 font-bold text-orange-600">15</td>
+                              <td className="px-3 py-3 font-bold text-emerald-600">85%</td>
+                            </>
+                          ) : (
+                            <td colSpan={4} className="px-3 py-3 bg-slate-50/40">
+                              {renderPreviewFieldNode(field)}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

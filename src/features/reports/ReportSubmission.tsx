@@ -75,6 +75,7 @@ export default function ReportSubmission() {
 
   const [form, setForm] = useState<FormDefinition | null>(null);
   const [villages, setVillages] = useState<Village[]>([]);
+  const [employeesList, setEmployeesList] = useState<Array<{ id: string; name: string; designation?: string }>>([]);
   const [selectedVillageId, setSelectedVillageId] = useState<string>('');
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [periodStart, setPeriodStart] = useState<string>('');
@@ -213,6 +214,12 @@ export default function ReportSubmission() {
             setVillages([]);
             setSelectedVillageId('');
           }
+        }
+
+        // Fetch employees list for Employee Selector fields
+        const { data: empData } = await (supabase.from('employees') as any).select('id, name, designation').order('name');
+        if (empData) {
+          setEmployeesList(empData);
         }
 
         // 3. If Edit Mode, fetch live submission record and values
@@ -825,6 +832,28 @@ export default function ReportSubmission() {
           />
         )}
 
+        {field.field_type === 'Time' && (
+          <input
+            type="time"
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
+        {field.field_type === 'Date & Time' && (
+          <input
+            type="datetime-local"
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
         {field.field_type === 'Yes/No' && (
           <div className="flex items-center gap-6 pt-1">
             <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -850,6 +879,79 @@ export default function ReportSubmission() {
           </div>
         )}
 
+        {field.field_type === 'Radio Button' && (
+          <div className="flex flex-wrap gap-3 pt-1">
+            {field.options && field.options.length > 0 ? (
+              field.options.map((opt) => (
+                <label 
+                  key={opt.id || opt.value} 
+                  className={`inline-flex items-center gap-2.5 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-all ${
+                    formData[field.id] === (opt.value || opt.label_en)
+                      ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={field.id}
+                    checked={formData[field.id] === (opt.value || opt.label_en)}
+                    onChange={() => handleInputChange(field.id, opt.value || opt.label_en)}
+                    className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+                  />
+                  <span>{language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en || opt.label_mr}</span>
+                </label>
+              ))
+            ) : (
+              <p className="text-xs text-slate-400 italic">No options configured for this radio field.</p>
+            )}
+          </div>
+        )}
+
+        {field.field_type === 'Checkbox' && (
+          <div className="flex flex-wrap gap-3 pt-1">
+            {field.options && field.options.length > 0 ? (
+              field.options.map((opt) => {
+                const optVal = opt.value || opt.label_en;
+                const currentVals = Array.isArray(formData[field.id]) 
+                  ? formData[field.id] 
+                  : (typeof formData[field.id] === 'string' && formData[field.id] ? formData[field.id].split(', ') : []);
+                const isChecked = currentVals.includes(optVal);
+
+                const toggleCheckbox = () => {
+                  let updated: string[];
+                  if (isChecked) {
+                    updated = currentVals.filter((v: string) => v !== optVal);
+                  } else {
+                    updated = [...currentVals, optVal];
+                  }
+                  handleInputChange(field.id, updated.join(', '));
+                };
+
+                return (
+                  <label 
+                    key={opt.id || optVal} 
+                    className={`inline-flex items-center gap-2.5 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-all ${
+                      isChecked
+                        ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={toggleCheckbox}
+                      className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300 rounded"
+                    />
+                    <span>{language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en || opt.label_mr}</span>
+                  </label>
+                );
+              })
+            ) : (
+              <p className="text-xs text-slate-400 italic">No options configured for this checkbox field.</p>
+            )}
+          </div>
+        )}
+
         {field.field_type === 'Dropdown' && (
           <select
             id={field.id}
@@ -860,11 +962,67 @@ export default function ReportSubmission() {
           >
             <option value="">{language === 'mr' ? '-- निवडा --' : '-- Select --'}</option>
             {field.options?.map((opt) => (
-              <option key={opt.id} value={opt.value}>
+              <option key={opt.id} value={opt.value || opt.label_en}>
                 {language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en}
               </option>
             ))}
           </select>
+        )}
+
+        {field.field_type === 'Village Selector' && (
+          <select
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="">{language === 'mr' ? '-- गाव निवडा --' : '-- Select Village --'}</option>
+            {villages.map((v) => (
+              <option key={v.id} value={v.name}>
+                {v.name} {v.code ? `(${v.code})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {field.field_type === 'Employee Selector' && (
+          <select
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="">{language === 'mr' ? '-- कर्मचारी निवडा --' : '-- Select Employee --'}</option>
+            {employeesList.map((emp) => (
+              <option key={emp.id} value={emp.name}>
+                {emp.name} {emp.designation ? `(${emp.designation})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {(field.field_type === 'File Upload' || field.field_type === 'Image Upload') && (
+          <div className="space-y-2">
+            <input
+              type="file"
+              id={field.id}
+              accept={field.field_type === 'Image Upload' ? 'image/*' : '*/*'}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleInputChange(field.id, file.name);
+                }
+              }}
+              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+            />
+            {formData[field.id] && (
+              <p className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                📎 {formData[field.id]}
+              </p>
+            )}
+          </div>
         )}
       </div>
     );
