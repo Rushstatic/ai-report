@@ -849,82 +849,104 @@ export default function FacilityMatrixReport() {
           onDirectExcelExport={handleDownloadExcel}
           customContent={
             <div className="space-y-4">
-              {/* Header block */}
-              <div className="text-center pb-2 border-b-2 border-slate-900">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  महाराष्ट्र शासन • सार्वजनिक आरोग्य विभाग
+              {/* Official Enclosed Government Header Box */}
+              <div className="border-2 border-slate-900 text-slate-950 text-[11px] mb-3 bg-white avoid-break shadow-xs">
+                <div className="border-b border-slate-900 py-1.5 px-3 text-center font-extrabold uppercase tracking-wide text-xs bg-slate-100">
+                  PUBLIC HEALTH DEPARTMENT - GOVERNMENT OF MAHARASHTRA
                 </div>
-                <h2 className="text-lg font-extrabold text-slate-950 mt-1">
-                  {selectedPhcName} {selectedFormTitle}
-                </h2>
-                <p className="text-xs font-semibold text-slate-600">
-                  Report for {formattedDate()}
-                </p>
+                <div className="border-b border-slate-900 py-1 px-3 text-center font-extrabold text-sm text-slate-900">
+                  Report Title: {selectedPhcName} {selectedFormTitle}
+                </div>
+                <div className="border-b border-slate-900 py-0.5 px-3 text-center font-semibold text-[11px] text-slate-700 bg-slate-50/50">
+                  Reporting Period: {formattedDate()}
+                </div>
+                <div className="border-b border-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-900 text-[10.5px]">
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">District:</span> {employee?.district_id || 'Latur'}
+                  </div>
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">Taluka:</span> {employee?.taluka_id || 'Ausa'}
+                  </div>
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">PHC:</span> {selectedPhcName}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-900 text-[10.5px]">
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">Sub-Centres:</span> {facilities.length - 1} Sub-centres + HQ
+                  </div>
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">Report Type:</span> Facility Matrix Summary
+                  </div>
+                  <div className="px-2.5 py-1">
+                    <span className="font-bold">Generated:</span> {new Date().toLocaleDateString('en-GB')}
+                  </div>
+                </div>
               </div>
 
               {/* Printable Table */}
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-slate-400 text-center text-[10px]">
+                <table className="w-full border-collapse border-2 border-slate-900 text-center text-[10px]">
                   <thead>
-                    <tr className="bg-slate-100 font-bold text-slate-800">
-                      <th rowSpan={3} className="border border-slate-400 px-2 py-1.5 w-8">Sr No</th>
-                      <th rowSpan={3} className="border border-slate-400 px-3 py-1.5 min-w-[150px] text-left">Name Of Health Center</th>
-                      <th colSpan={2} className="border border-slate-400 px-2 py-1">Scrub Typhus Cases</th>
-                      <th colSpan={8} className="border border-slate-400 px-2 py-1">Tests Conducted</th>
-                      <th colSpan={8} className="border border-slate-400 px-2 py-1">Positive Cases</th>
-                      <th colSpan={2} className="border border-slate-400 px-2 py-1">Deaths</th>
+                    <tr className="bg-slate-100 font-bold text-slate-900 border-b border-slate-900">
+                      <th rowSpan={3} className="border border-slate-900 px-2 py-1.5 w-8">Sr No</th>
+                      <th rowSpan={3} className="border border-slate-900 px-3 py-1.5 min-w-[150px] text-left">Name Of Health Center</th>
+                      <th colSpan={2} className="border border-slate-900 px-2 py-1">Scrub Typhus Cases</th>
+                      <th colSpan={8} className="border border-slate-900 px-2 py-1">Tests Conducted</th>
+                      <th colSpan={8} className="border border-slate-900 px-2 py-1">Positive Cases</th>
+                      <th colSpan={2} className="border border-slate-900 px-2 py-1">Deaths</th>
                     </tr>
-                    <tr className="bg-slate-50 font-semibold text-[9px] text-slate-600">
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">RDK Tests</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">Weil-Felix Tests</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">ELISA IgM Tests</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1 font-bold">Total Tests</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">RDK Positive</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">Weil-Felix Positive</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1">ELISA IgM Positive</th>
-                      <th colSpan={2} className="border border-slate-400 px-1 py-1 font-bold">Total Positive</th>
+                    <tr className="bg-slate-50 font-bold text-[9px] text-slate-800 border-b border-slate-900">
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">RDK Tests</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">Weil-Felix Tests</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">ELISA IgM Tests</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1 font-bold">Total Tests</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">RDK Positive</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">Weil-Felix Positive</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1">ELISA IgM Positive</th>
+                      <th colSpan={2} className="border border-slate-900 px-1 py-1 font-bold">Total Positive</th>
                     </tr>
-                    <tr className="bg-slate-50 font-medium text-[8.5px] text-slate-500">
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Pro</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
-                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                    <tr className="bg-slate-50 font-medium text-[8.5px] text-slate-700 border-b border-slate-900">
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5 font-bold">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5 font-bold">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5 font-bold">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5 font-bold">Pro</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-900 px-1 py-0.5">Pro</th>
                     </tr>
                   </thead>
                   <tbody>
                     {facilities.map((fac) => (
                       <tr key={fac.id} className="hover:bg-slate-50 print-row">
-                        <td className="border border-slate-400 px-1 py-1 text-center font-medium">{fac.srNo}</td>
-                        <td className={`border border-slate-400 px-2 py-1 text-left font-bold ${fac.isPhcHq ? 'text-blue-900 bg-blue-50/20' : 'text-slate-800'}`}>
+                        <td className="border border-slate-900 px-1 py-1 text-center font-medium">{fac.srNo}</td>
+                        <td className={`border border-slate-900 px-2 py-1 text-left font-bold ${fac.isPhcHq ? 'text-blue-900 bg-blue-50/20' : 'text-slate-800'}`}>
                           {language === 'mr' ? fac.nameMr : fac.nameEn}
                         </td>
                         {metricColumns.map((col) => (
-                          <td key={col.id} className="border border-slate-400 px-1 py-1 text-center font-medium">
+                          <td key={col.id} className="border border-slate-900 px-1 py-1 text-center font-medium">
                             {fac.values[col.id] !== undefined ? fac.values[col.id] : 0}
                           </td>
                         ))}
                       </tr>
                     ))}
-                    <tr className="bg-slate-100 font-bold border-t-2 border-b-2 border-slate-600">
-                      <td colSpan={2} className="border border-slate-400 px-2 py-1.5 text-center font-extrabold text-slate-900">Total</td>
+                    <tr className="bg-slate-100 font-bold border-t-2 border-b-2 border-slate-900">
+                      <td colSpan={2} className="border border-slate-900 px-2 py-1.5 text-center font-extrabold text-slate-900">Total</td>
                       {metricColumns.map((col) => (
-                        <td key={col.id} className="border border-slate-400 px-1 py-1.5 text-center font-extrabold text-slate-950">
+                        <td key={col.id} className="border border-slate-900 px-1 py-1.5 text-center font-extrabold text-slate-950">
                           {calculateTotal(col.id)}
                         </td>
                       ))}

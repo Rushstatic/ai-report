@@ -532,149 +532,211 @@ export default function PrintPreviewModal({
               /* Standard Structured Report View */
               <div className="space-y-4 text-slate-900 font-sans">
                 
-                {/* Official Masthead Header */}
+                {/* Official Enclosed Government Header Box (Matching Sample Format) */}
                 {showHeader && (
-                  <div className="border-b-2 border-slate-900 pb-3 mb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
-                          महाराष्ट्र शासन • सार्वजनिक आरोग्य विभाग
-                        </div>
-                        <div className="text-[9px] font-semibold text-slate-500">
-                          Government of Maharashtra • Public Health Department
-                        </div>
+                  <div className="border-2 border-slate-900 text-slate-950 text-[11px] mb-3 bg-white avoid-break shadow-xs">
+                    {/* Row 1: Main Government Department Banner */}
+                    <div className="border-b border-slate-900 py-1.5 px-3 text-center font-extrabold uppercase tracking-wide text-xs bg-slate-100">
+                      PUBLIC HEALTH DEPARTMENT - GOVERNMENT OF MAHARASHTRA
+                    </div>
+
+                    {/* Row 2: Report Title */}
+                    <div className="border-b border-slate-900 py-1 px-3 text-center font-extrabold text-sm text-slate-900">
+                      Report Title: {reportData.formName}
+                    </div>
+
+                    {/* Row 3: Reporting Period */}
+                    <div className="border-b border-slate-900 py-0.5 px-3 text-center font-semibold text-[11px] text-slate-700 bg-slate-50/50">
+                      Reporting Period: {reportData.periodStart} to {reportData.periodEnd}
+                    </div>
+
+                    {/* Row 4: Administrative Hierarchy (District, Taluka, PHC) */}
+                    <div className="border-b border-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-900 text-[10.5px]">
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">District:</span> {reportData.district}
                       </div>
-                      <div className="text-right">
-                        <span className="inline-block px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-900 font-bold text-[10px]">
-                          {reportData.reportingPeriod || 'दैनिक/मासिक अहवाल'}
-                        </span>
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">Taluka:</span> {reportData.taluka}
+                      </div>
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">PHC:</span> {reportData.phc}
                       </div>
                     </div>
 
-                    <h1 className="text-base sm:text-lg font-extrabold text-slate-950 mt-1.5 tracking-tight">
-                      {reportData.formName}
-                    </h1>
-                  </div>
-                )}
-
-                {/* Geographical & Administrative Meta Grid */}
-                {showMetaGrid && (
-                  <div className="bg-slate-50 border border-slate-300 rounded-lg p-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-slate-700 avoid-break">
-                    <div>
-                      <span className="font-bold text-slate-900">जिल्हा / District:</span> {reportData.district}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">तालुका / Taluka:</span> {reportData.taluka}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">प्रा.आ.के. / PHC:</span> {reportData.phc}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">उपकेंद्र / Sub-Centre:</span> {reportData.subcentre}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">गाव / Village:</span> {reportData.village}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">कालावधी / Period:</span> {reportData.periodStart} ते {reportData.periodEnd}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">सादरकर्ता / Staff:</span> {reportData.submittedBy}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900">अहवाल स्थिती / Status:</span> {reportData.status}
+                    {/* Row 5: Local Facility & Submitter (Sub-Centre, Village, Submitted By) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-900 text-[10.5px]">
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">Sub-Centre:</span> {reportData.subcentre}
+                      </div>
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">Village:</span> {reportData.village}
+                      </div>
+                      <div className="px-2.5 py-1">
+                        <span className="font-bold">Submitted By:</span> {reportData.submittedBy} ({reportData.employeeType})
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Structured Metrics Table */}
-                <table className="w-full border-collapse border border-slate-300 text-left text-[11px] my-3">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-400">
-                      <th className="border border-slate-300 px-2 py-1.5 text-center w-9">अ.क्र.</th>
-                      {orientation === 'landscape' && (
-                        <th className="border border-slate-300 px-2 py-1.5 w-1/4">मुख्य गट (Category)</th>
-                      )}
-                      <th className="border border-slate-300 px-2.5 py-1.5">
-                        {displayLanguage === 'mr' 
-                          ? 'आरोग्य निर्देशक / बाब' 
-                          : displayLanguage === 'en' 
-                          ? 'Health Indicator / Metric' 
-                          : 'आरोग्य निर्देशक / बाब (Health Metric)'}
-                      </th>
-                      {orientation === 'landscape' && (
-                        <th className="border border-slate-300 px-2 py-1.5 text-center w-24">प्रकार</th>
-                      )}
-                      <th className="border border-slate-300 px-2.5 py-1.5 text-right w-28">
-                        {displayLanguage === 'mr' ? 'नोंद (Value)' : 'Recorded Value'}
-                      </th>
-                      <th className="border border-slate-300 px-2 py-1.5 text-center w-20">स्थिती</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.rows.map((r, idx) => {
-                      if (r.isHeader) {
+                {/* Primary Hierarchical Matrix Table (Multi-Tier Column Headers matching sample) */}
+                {reportData.matrixTable && reportData.matrixTable.headerTiers.length > 0 ? (
+                  <div className="overflow-x-auto my-3">
+                    <table className="w-full border-collapse border-2 border-slate-900 text-center text-[10.5px]">
+                      <thead>
+                        {reportData.matrixTable.headerTiers.map((tier, tIdx) => (
+                          <tr key={tIdx} className="bg-slate-100 font-bold text-slate-900 border-b border-slate-900">
+                            {tier.cells.map((cell) => (
+                              <th
+                                key={cell.id}
+                                colSpan={cell.colSpan}
+                                rowSpan={cell.rowSpan}
+                                className="border border-slate-900 px-2 py-1.5 text-center font-bold text-slate-900 bg-slate-100"
+                              >
+                                {displayLanguage === 'mr' ? cell.labelMr : displayLanguage === 'en' ? cell.labelEn : cell.label}
+                              </th>
+                            ))}
+                          </tr>
+                        ))}
+                      </thead>
+                      <tbody>
+                        {reportData.matrixTable.rows.map((row, rIdx) => (
+                          <tr key={rIdx} className="hover:bg-slate-50 print-row">
+                            <td className="border border-slate-900 px-2 py-1.5 text-center font-semibold text-slate-800">
+                              {row.srNo}
+                            </td>
+                            {reportData.matrixTable!.leafColumns.map((col) => (
+                              <td
+                                key={col.id}
+                                className="border border-slate-900 px-2 py-1.5 text-center font-extrabold text-slate-950"
+                              >
+                                {row.values[col.id] !== undefined && row.values[col.id] !== '' ? row.values[col.id] : '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  /* Standard Hierarchical Metrics Table fallback */
+                  <table className="w-full border-collapse border border-slate-300 text-left text-[11px] my-3">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-800 font-bold border-b-2 border-slate-400">
+                        <th className="border border-slate-300 px-2 py-1.5 text-center w-9">अ.क्र.</th>
+                        {orientation === 'landscape' && (
+                          <th className="border border-slate-300 px-2 py-1.5 w-1/4">मुख्य गट (Category)</th>
+                        )}
+                        <th className="border border-slate-300 px-2.5 py-1.5">
+                          {displayLanguage === 'mr' 
+                            ? 'आरोग्य निर्देशक / बाब' 
+                            : displayLanguage === 'en' 
+                            ? 'Health Indicator / Metric' 
+                            : 'आरोग्य निर्देशक / बाब (Health Metric)'}
+                        </th>
+                        {orientation === 'landscape' && (
+                          <th className="border border-slate-300 px-2 py-1.5 text-center w-24">प्रकार</th>
+                        )}
+                        <th className="border border-slate-300 px-2.5 py-1.5 text-right w-28">
+                          {displayLanguage === 'mr' ? 'नोंद (Value)' : 'Recorded Value'}
+                        </th>
+                        <th className="border border-slate-300 px-2 py-1.5 text-center w-20">स्थिती</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.rows.map((r, idx) => {
+                        if (r.isHeader) {
+                          return (
+                            <tr key={idx} className="bg-slate-100/90 font-bold text-slate-950 border-t border-b border-slate-300">
+                              <td className="border border-slate-300 px-2 py-1 text-center font-bold text-slate-600">
+                                {r.srNo}
+                              </td>
+                              {orientation === 'landscape' && (
+                                <td className="border border-slate-300 px-2 py-1 text-blue-900 font-bold">
+                                  {r.mainCategory}
+                                </td>
+                              )}
+                              <td colSpan={orientation === 'landscape' ? 1 : 1} className="border border-slate-300 px-2.5 py-1 text-slate-900">
+                                <span className="text-blue-700 mr-1.5">📁</span>
+                                {displayLanguage === 'mr' ? r.fieldLabelMr || r.displayLabel : displayLanguage === 'en' ? r.fieldLabelEn || r.displayLabel : r.bilingualLabel}
+                              </td>
+                              {orientation === 'landscape' && (
+                                <td className="border border-slate-300 px-2 py-1 text-center text-slate-500 font-medium">
+                                  गट शीर्षक
+                                </td>
+                              )}
+                              <td className="border border-slate-300 px-2.5 py-1 text-right text-slate-400 font-semibold">
+                                -
+                              </td>
+                              <td className="border border-slate-300 px-2 py-1 text-center text-slate-400">
+                                -
+                              </td>
+                            </tr>
+                          );
+                        }
+
                         return (
-                          <tr key={idx} className="bg-slate-100/90 font-bold text-slate-950 border-t border-b border-slate-300">
-                            <td className="border border-slate-300 px-2 py-1 text-center font-bold text-slate-600">
+                          <tr key={idx} className="hover:bg-slate-50/50 print-row">
+                            <td className="border border-slate-300 px-2 py-1 text-center text-slate-500">
                               {r.srNo}
                             </td>
                             {orientation === 'landscape' && (
-                              <td className="border border-slate-300 px-2 py-1 text-blue-900 font-bold">
-                                {r.mainCategory}
+                              <td className="border border-slate-300 px-2 py-1 text-slate-600 text-[10px]">
+                                {r.mainCategory || '-'}
                               </td>
                             )}
-                            <td colSpan={orientation === 'landscape' ? 1 : 1} className="border border-slate-300 px-2.5 py-1 text-slate-900">
-                              <span className="text-blue-700 mr-1.5">📁</span>
+                            <td className={`border border-slate-300 px-2.5 py-1 ${
+                              r.depth > 0 ? 'pl-6 text-slate-800 font-medium' : 'text-slate-900'
+                            }`}>
+                              {r.depth > 0 && <span className="text-slate-400 mr-1.5 font-bold">↳</span>}
                               {displayLanguage === 'mr' ? r.fieldLabelMr || r.displayLabel : displayLanguage === 'en' ? r.fieldLabelEn || r.displayLabel : r.bilingualLabel}
                             </td>
                             {orientation === 'landscape' && (
-                              <td className="border border-slate-300 px-2 py-1 text-center text-slate-500 font-medium">
-                                गट शीर्षक
+                              <td className="border border-slate-300 px-2 py-1 text-center text-[10px] text-slate-500">
+                                {r.fieldType}
                               </td>
                             )}
-                            <td className="border border-slate-300 px-2.5 py-1 text-right text-slate-400 font-semibold">
-                              -
+                            <td className="border border-slate-300 px-2.5 py-1 text-right font-bold text-slate-950">
+                              {r.value}
                             </td>
-                            <td className="border border-slate-300 px-2 py-1 text-center text-slate-400">
-                              -
+                            <td className="border border-slate-300 px-2 py-1 text-center text-[10px] text-slate-600">
+                              {r.status}
                             </td>
                           </tr>
                         );
-                      }
+                      })}
+                    </tbody>
+                  </table>
+                )}
 
-                      return (
-                        <tr key={idx} className="hover:bg-slate-50/50 print-row">
-                          <td className="border border-slate-300 px-2 py-1 text-center text-slate-500">
-                            {r.srNo}
-                          </td>
-                          {orientation === 'landscape' && (
-                            <td className="border border-slate-300 px-2 py-1 text-slate-600 text-[10px]">
-                              {r.mainCategory || '-'}
-                            </td>
-                          )}
-                          <td className={`border border-slate-300 px-2.5 py-1 ${
-                            r.depth > 0 ? 'pl-6 text-slate-800 font-medium' : 'text-slate-900'
-                          }`}>
-                            {r.depth > 0 && <span className="text-slate-400 mr-1.5 font-bold">↳</span>}
-                            {displayLanguage === 'mr' ? r.fieldLabelMr || r.displayLabel : displayLanguage === 'en' ? r.fieldLabelEn || r.displayLabel : r.bilingualLabel}
-                          </td>
-                          {orientation === 'landscape' && (
-                            <td className="border border-slate-300 px-2 py-1 text-center text-[10px] text-slate-500">
-                              {r.fieldType}
-                            </td>
-                          )}
-                          <td className="border border-slate-300 px-2.5 py-1 text-right font-bold text-slate-950">
-                            {r.value}
-                          </td>
-                          <td className="border border-slate-300 px-2 py-1 text-center text-[10px] text-slate-600">
-                            {r.status}
-                          </td>
+                {/* Additional Detailed Field View (if matrix table was shown and user wants full breakdown) */}
+                {reportData.matrixTable && reportData.rows.length > 0 && (
+                  <details className="mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600 no-print">
+                    <summary className="font-bold text-slate-800 cursor-pointer hover:text-blue-600 select-none">
+                      {language === 'mr' ? '▼ सर्व बाबींची तपशीलवार यादी (Detailed Field Breakdown)' : '▼ Detailed Field Breakdown (List View)'}
+                    </summary>
+                    <table className="w-full border-collapse border border-slate-300 text-left text-[10.5px] mt-2">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
+                          <th className="border border-slate-300 px-2 py-1 text-center w-8">#</th>
+                          <th className="border border-slate-300 px-2 py-1">बाब (Indicator)</th>
+                          <th className="border border-slate-300 px-2 py-1 text-right w-24">नोंद (Value)</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {reportData.rows.map((r, idx) => (
+                          <tr key={idx} className={r.isHeader ? 'bg-slate-50 font-bold' : 'hover:bg-slate-50/50'}>
+                            <td className="border border-slate-300 px-2 py-1 text-center text-slate-500">{r.srNo}</td>
+                            <td className={`border border-slate-300 px-2 py-1 ${r.depth > 0 ? 'pl-5' : ''}`}>
+                              {r.isHeader && <span className="text-blue-600 mr-1">📁</span>}
+                              {displayLanguage === 'mr' ? r.fieldLabelMr || r.displayLabel : r.fieldLabelEn || r.displayLabel}
+                            </td>
+                            <td className="border border-slate-300 px-2 py-1 text-right font-bold text-slate-900">{r.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                )}
 
                 {/* Official Signatures Block */}
                 {showSignatures && (

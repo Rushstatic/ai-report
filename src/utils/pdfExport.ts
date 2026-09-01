@@ -57,203 +57,241 @@ export const exportStructuredReportToPDF = (
   doc.setFillColor(37, 99, 235); // Blue-600
   doc.rect(0, 4.5, pageWidth, 1.5, 'F');
 
-  // 2. Official Header
+  // 2. Official Header Box (Enclosed Format Matching Government Guidelines)
   let currentY = 12;
 
-  // Header Subtitle / Dept name
+  const boxX = margin;
+  const boxWidth = contentWidth;
+  const rowHeight = 6.5;
+  const totalBoxHeight = rowHeight * 5;
+
+  // Outer Border Box
+  doc.setDrawColor(15, 23, 42); // Slate-900
+  doc.setLineWidth(0.4);
+  doc.rect(boxX, currentY, boxWidth, totalBoxHeight, 'S');
+
+  // Horizontal Grid Lines inside Header Box
+  doc.setLineWidth(0.2);
+  doc.line(boxX, currentY + rowHeight, boxX + boxWidth, currentY + rowHeight);
+  doc.line(boxX, currentY + (rowHeight * 2), boxX + boxWidth, currentY + (rowHeight * 2));
+  doc.line(boxX, currentY + (rowHeight * 3), boxX + boxWidth, currentY + (rowHeight * 3));
+  doc.line(boxX, currentY + (rowHeight * 4), boxX + boxWidth, currentY + (rowHeight * 4));
+
+  // Row 1: Header Banner (Top title)
+  doc.setFillColor(241, 245, 249);
+  doc.rect(boxX + 0.2, currentY + 0.2, boxWidth - 0.4, rowHeight - 0.4, 'F');
   doc.setFontSize(8.5);
-  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.text('PUBLIC HEALTH DEPARTMENT • DISTRICT HEALTH ADMINISTRATION', margin, currentY);
+  doc.text('PUBLIC HEALTH DEPARTMENT - GOVERNMENT OF MAHARASHTRA', pageWidth / 2, currentY + 4.5, { align: 'center' });
 
-  // Orientation Badge on the Right
-  const orientationBadgeText = `A4 ${orientation.toUpperCase()}`;
-  doc.setFontSize(8);
-  doc.setTextColor(37, 99, 235);
-  doc.setFillColor(239, 246, 255);
-  doc.roundedRect(pageWidth - margin - 26, currentY - 4, 26, 6, 1, 1, 'FD');
-  doc.text(orientationBadgeText, pageWidth - margin - 23, currentY);
-
-  currentY += 7;
-
-  // Main Report Title
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42); // Slate-900
+  // Row 2: Report Title
+  doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
-  const splitTitle = doc.splitTextToSize(title, contentWidth - 30);
-  doc.text(splitTitle, margin, currentY);
-  currentY += (splitTitle.length * 6) + 1;
+  doc.text(`Report Title: ${title}`, pageWidth / 2, currentY + rowHeight + 4.5, { align: 'center' });
 
-  // 3. Metadata Summary Card / Grid
-  const metaBoxY = currentY;
-  const metaBoxHeight = orientation === 'landscape' ? 22 : 26;
-
-  doc.setFillColor(248, 250, 252); // Slate-50
-  doc.setDrawColor(226, 232, 240); // Slate-200
-  doc.roundedRect(margin, metaBoxY, contentWidth, metaBoxHeight, 1.5, 1.5, 'FD');
-
+  // Row 3: Reporting Period
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(51, 65, 85); // Slate-700
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Reporting Period: ${period}`, pageWidth / 2, currentY + (rowHeight * 2) + 4.5, { align: 'center' });
 
-  if (orientation === 'landscape') {
-    // 4-column layout for Landscape
-    const colWidth = contentWidth / 4;
-    
-    // Row 1
-    doc.text(`District: ${options.district || reportData.district || 'Latur'}`, margin + 4, metaBoxY + 6);
-    doc.text(`Taluka: ${options.taluka || reportData.taluka || 'Latur'}`, margin + 4 + colWidth, metaBoxY + 6);
-    doc.text(`PHC: ${options.phc || reportData.phc || 'PHC'}`, margin + 4 + (colWidth * 2), metaBoxY + 6);
-    doc.text(`Sub-Centre: ${options.subcentre || reportData.subcentre || 'Sub-centre'}`, margin + 4 + (colWidth * 3), metaBoxY + 6);
+  // Row 4: District / Taluka / PHC (3 Columns)
+  const col1W = boxWidth / 3;
+  doc.line(boxX + col1W, currentY + (rowHeight * 3), boxX + col1W, currentY + (rowHeight * 4));
+  doc.line(boxX + (col1W * 2), currentY + (rowHeight * 3), boxX + (col1W * 2), currentY + (rowHeight * 4));
 
-    // Row 2
-    doc.text(`Village: ${options.village || reportData.village || 'All Villages'}`, margin + 4, metaBoxY + 13);
-    doc.text(`Period: ${period}`, margin + 4 + colWidth, metaBoxY + 13);
-    doc.text(`Submitted By: ${reportData.submittedBy} (${reportData.employeeType})`, margin + 4 + (colWidth * 2), metaBoxY + 13);
-    
-    // Status text with badge style
-    doc.text(`Status: ${status} | Date: ${reportData.submittedAt || 'Recent'}`, margin + 4 + (colWidth * 3), metaBoxY + 13);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`District: `, boxX + 3, currentY + (rowHeight * 3) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${options.district || reportData.district || 'Latur'}`, boxX + 16, currentY + (rowHeight * 3) + 4.5);
 
-    // Row 3 (Guidance info)
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`* Hierarchical subfields are grouped under their respective Main Field Headings below.`, margin + 4, metaBoxY + 19);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Taluka: `, boxX + col1W + 3, currentY + (rowHeight * 3) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${options.taluka || reportData.taluka || 'Latur'}`, boxX + col1W + 15, currentY + (rowHeight * 3) + 4.5);
 
-  } else {
-    // 2-column layout for Portrait
-    const colWidth = contentWidth / 2;
+  doc.setFont('helvetica', 'bold');
+  doc.text(`PHC: `, boxX + (col1W * 2) + 3, currentY + (rowHeight * 3) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${options.phc || reportData.phc || 'PHC'}`, boxX + (col1W * 2) + 12, currentY + (rowHeight * 3) + 4.5);
 
-    // Row 1
-    doc.text(`District: ${options.district || reportData.district || 'Latur'}`, margin + 4, metaBoxY + 6);
-    doc.text(`PHC: ${options.phc || reportData.phc || 'PHC'}`, margin + 4 + colWidth, metaBoxY + 6);
+  // Row 5: Sub-Centre / Village / Submitted By (3 Columns)
+  doc.line(boxX + col1W, currentY + (rowHeight * 4), boxX + col1W, currentY + (rowHeight * 5));
+  doc.line(boxX + (col1W * 2), currentY + (rowHeight * 4), boxX + (col1W * 2), currentY + (rowHeight * 5));
 
-    // Row 2
-    doc.text(`Sub-Centre: ${options.subcentre || reportData.subcentre || 'Sub-centre'}`, margin + 4, metaBoxY + 12);
-    doc.text(`Village: ${options.village || reportData.village || 'All Villages'}`, margin + 4 + colWidth, metaBoxY + 12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Sub-Centre: `, boxX + 3, currentY + (rowHeight * 4) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${options.subcentre || reportData.subcentre || 'Sub-centre'}`, boxX + 20, currentY + (rowHeight * 4) + 4.5);
 
-    // Row 3
-    doc.text(`Period: ${period}`, margin + 4, metaBoxY + 18);
-    doc.text(`Staff: ${reportData.submittedBy} (${reportData.employeeType})`, margin + 4 + colWidth, metaBoxY + 18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Village: `, boxX + col1W + 3, currentY + (rowHeight * 4) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${options.village || reportData.village || 'All Villages'}`, boxX + col1W + 15, currentY + (rowHeight * 4) + 4.5);
 
-    // Row 4
-    doc.text(`Status: ${status}`, margin + 4, metaBoxY + 23);
-    doc.text(`Submission Date: ${reportData.submittedAt || 'Draft'}`, margin + 4 + colWidth, metaBoxY + 23);
-  }
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Submitted By: `, boxX + (col1W * 2) + 3, currentY + (rowHeight * 4) + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${reportData.submittedBy} (${reportData.employeeType})`, boxX + (col1W * 2) + 23, currentY + (rowHeight * 4) + 4.5);
 
-  currentY = metaBoxY + metaBoxHeight + 5;
+  currentY += totalBoxHeight + 5;
 
-  // 4. AutoTable Generation with Subfield Hierarchy & Field Headings
-  let tableHeaders: string[] = [];
-  let tableBody: any[][] = [];
-  let columnStyles: any = {};
-
-  if (orientation === 'landscape') {
-    // 6 Columns for Landscape
-    tableHeaders = [
-      'Sr. No.',
-      'Main Field Heading / Category',
-      'Indicator / Subfield Name',
-      'Field Type',
-      'Reported Value',
-      'Status'
-    ];
-
-    columnStyles = {
-      0: { cellWidth: 16, halign: 'center' },
-      1: { cellWidth: 60, fontStyle: 'bold' },
-      2: { cellWidth: 95 },
-      3: { cellWidth: 32, halign: 'center' },
-      4: { cellWidth: 42, halign: 'center', fontStyle: 'bold' },
-      5: { cellWidth: 24, halign: 'center' }
-    };
-
-    tableBody = reportData.rows.map((r: StructuredReportRow) => {
-      const isHeader = r.isHeader;
-      const indicatorText = isHeader
-        ? `📂 [Group Header] ${r.displayLabel}`
-        : r.displayLabel;
-
-      return [
-        r.srNo,
-        r.mainCategory || '-',
-        indicatorText,
-        r.fieldType,
-        isHeader ? '-' : r.value,
-        r.status
-      ];
-    });
-
-  } else {
-    // 4 Columns for Portrait (A4 Standard)
-    tableHeaders = [
-      'Sr.',
-      'Health Metric / Subfield Indicator',
-      'Reported Value',
-      'Status'
-    ];
-
-    columnStyles = {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 104 },
-      2: { cellWidth: 40, halign: 'center', fontStyle: 'bold' },
-      3: { cellWidth: 24, halign: 'center' }
-    };
-
-    tableBody = reportData.rows.map((r: StructuredReportRow) => {
-      const isHeader = r.isHeader;
-      const indicatorText = isHeader
-        ? `📂 [GROUP] ${r.displayLabel}`
-        : r.displayLabel;
-
-      return [
-        r.srNo,
-        indicatorText,
-        isHeader ? '[Category]' : r.value,
-        r.status
-      ];
-    });
-  }
-
-  // Draw AutoTable
-  autoTable(doc, {
-    startY: currentY,
-    head: [tableHeaders],
-    body: tableBody,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [15, 23, 42], // Slate-900
-      textColor: [255, 255, 255],
-      fontSize: 8.5,
-      fontStyle: 'bold',
-      halign: 'center',
-      cellPadding: 3.5
-    },
-    styles: {
-      fontSize: 8,
-      cellPadding: 3,
-      lineColor: [226, 232, 240], // Slate-200
-      lineWidth: 0.2,
-      textColor: [30, 41, 59]
-    },
-    columnStyles,
-    didParseCell: (data) => {
-      // Highlight Group Header Rows
-      const rowIndex = data.row.index;
-      const rowData = reportData.rows[rowIndex];
-
-      if (rowData && rowData.isHeader) {
-        data.cell.styles.fillColor = [241, 245, 249]; // Slate-100 highlight
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.textColor = [15, 23, 42]; // Slate-900
-      } else if (rowData && rowData.depth > 0) {
-        // Subfield styling
-        if (data.column.index === (orientation === 'landscape' ? 2 : 1)) {
-          data.cell.styles.textColor = [51, 65, 85];
+  // 4. AutoTable Generation (Hierarchical Matrix Header OR Standard List)
+  if (reportData.matrixTable && reportData.matrixTable.headerTiers.length > 0) {
+    // Multi-tier Matrix Header Table (e.g. Home Visits, Fever Cases, etc.)
+    const matrixHead = reportData.matrixTable.headerTiers.map((tier) =>
+      tier.cells.map((cell) => ({
+        content: lang === 'mr' ? cell.labelMr : lang === 'en' ? cell.labelEn : cell.label,
+        colSpan: cell.colSpan,
+        rowSpan: cell.rowSpan,
+        styles: {
+          halign: 'center' as const,
+          valign: 'middle' as const,
+          fontStyle: 'bold' as const,
+          fillColor: [241, 245, 249] as [number, number, number],
+          textColor: [15, 23, 42] as [number, number, number],
+          lineWidth: 0.2,
+          lineColor: [15, 23, 42] as [number, number, number]
         }
-      }
-    },
-    margin: { left: margin, right: margin, bottom: 25 }
-  });
+      }))
+    );
+
+    const matrixBody = reportData.matrixTable.rows.map((row) => [
+      row.srNo,
+      ...reportData.matrixTable!.leafColumns.map((col) =>
+        row.values[col.id] !== undefined && row.values[col.id] !== '' ? String(row.values[col.id]) : '-'
+      )
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      head: matrixHead,
+      body: matrixBody,
+      theme: 'grid',
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2.5,
+        lineColor: [15, 23, 42], // Slate-900 border
+        lineWidth: 0.2,
+        textColor: [15, 23, 42],
+        halign: 'center',
+        valign: 'middle'
+      },
+      headStyles: {
+        fontSize: 7.5,
+        fontStyle: 'bold',
+        halign: 'center',
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42]
+      },
+      margin: { left: margin, right: margin, bottom: 25 }
+    });
+  } else {
+    // Standard Structured Table
+    let tableHeaders: string[] = [];
+    let tableBody: any[][] = [];
+    let columnStyles: any = {};
+
+    if (orientation === 'landscape') {
+      tableHeaders = [
+        'Sr. No.',
+        'Main Field Heading / Category',
+        'Indicator / Subfield Name',
+        'Field Type',
+        'Reported Value',
+        'Status'
+      ];
+
+      columnStyles = {
+        0: { cellWidth: 16, halign: 'center' },
+        1: { cellWidth: 60, fontStyle: 'bold' },
+        2: { cellWidth: 95 },
+        3: { cellWidth: 32, halign: 'center' },
+        4: { cellWidth: 42, halign: 'center', fontStyle: 'bold' },
+        5: { cellWidth: 24, halign: 'center' }
+      };
+
+      tableBody = reportData.rows.map((r: StructuredReportRow) => {
+        const isHeader = r.isHeader;
+        const indicatorText = isHeader
+          ? `📂 [Group Header] ${r.displayLabel}`
+          : r.displayLabel;
+
+        return [
+          r.srNo,
+          r.mainCategory || '-',
+          indicatorText,
+          r.fieldType,
+          isHeader ? '-' : r.value,
+          r.status
+        ];
+      });
+    } else {
+      tableHeaders = [
+        'Sr.',
+        'Health Metric / Subfield Indicator',
+        'Reported Value',
+        'Status'
+      ];
+
+      columnStyles = {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 104 },
+        2: { cellWidth: 40, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 24, halign: 'center' }
+      };
+
+      tableBody = reportData.rows.map((r: StructuredReportRow) => {
+        const isHeader = r.isHeader;
+        const indicatorText = isHeader
+          ? `📂 [GROUP] ${r.displayLabel}`
+          : r.displayLabel;
+
+        return [
+          r.srNo,
+          indicatorText,
+          isHeader ? '[Category]' : r.value,
+          r.status
+        ];
+      });
+    }
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [tableHeaders],
+      body: tableBody,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontSize: 8.5,
+        fontStyle: 'bold',
+        halign: 'center',
+        cellPadding: 3.5
+      },
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+        textColor: [30, 41, 59]
+      },
+      columnStyles,
+      didParseCell: (data) => {
+        const rowIndex = data.row.index;
+        const rowData = reportData.rows[rowIndex];
+
+        if (rowData && rowData.isHeader) {
+          data.cell.styles.fillColor = [241, 245, 249];
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [15, 23, 42];
+        }
+      },
+      margin: { left: margin, right: margin, bottom: 25 }
+    });
+  }
 
   // 5. Signatures & Page Footers
   const pageCount = (doc as any).internal.getNumberOfPages();
