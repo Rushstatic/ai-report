@@ -10,8 +10,10 @@ import {
   AlertCircle, 
   CheckCircle2, 
   FileText,
-  UserCheck
+  UserCheck,
+  Download
 } from 'lucide-react';
+import ReportDownloadModal from '@/components/ReportDownloadModal';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
@@ -73,6 +75,7 @@ export default function ReportSubmission() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Set default period (Current month)
   useEffect(() => {
@@ -649,6 +652,17 @@ export default function ReportSubmission() {
               ? (language === 'mr' ? '👤 Employee-wise (स्वतंत्र)' : '👤 Employee-wise (Individual)')
               : (language === 'mr' ? '👥 उपकेंद्र सादरीकरण' : '👥 Facility Submission')}
           </span>
+
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => setShowDownloadModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-full text-xs font-bold transition-all shadow-2xs cursor-pointer ml-1"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600" />
+              {language === 'mr' ? 'A4 अहवाल डाऊनलोड' : 'Download A4 Report'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -796,6 +810,22 @@ export default function ReportSubmission() {
           </button>
         </div>
       </div>
+
+      {showDownloadModal && submissionId && (
+        <ReportDownloadModal
+          isOpen={showDownloadModal}
+          report={{
+            id: submissionId,
+            form_id: formId,
+            period_start: periodStart,
+            period_end: periodEnd,
+            forms: form,
+            villages: villages.find(v => v.id === selectedVillageId),
+            employees: employee
+          }}
+          onClose={() => setShowDownloadModal(false)}
+        />
+      )}
     </div>
   );
 }

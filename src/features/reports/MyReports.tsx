@@ -12,9 +12,15 @@ import {
   Send,
   X,
   Calendar,
-  Loader2
+  Loader2,
+  FileSpreadsheet,
+  Printer,
+  ChevronDown
 } from 'lucide-react';
-import { exportToPDF } from '@/utils/pdfExport';
+import { exportStructuredReportToPDF, exportToPDF } from '@/utils/pdfExport';
+import { exportStructuredReportToExcel } from '@/utils/excelExport';
+import { prepareReportData } from '@/utils/reportDataHelper';
+import ReportDownloadModal from '@/components/ReportDownloadModal';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +38,7 @@ export default function MyReports() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectedReportForDownload, setSelectedReportForDownload] = useState<any | null>(null);
 
   const isController = employee?.employee_type?.includes('CONTROLLER');
   const subcentreName = (employee as any)?.sub_centres?.name || 'Sub-centre';
@@ -114,65 +121,21 @@ export default function MyReports() {
     return true;
   });
 
-  const handleDownloadPDF = async (report: any) => {
+  const handleDownloadPDF = async (report: any, orientation: 'portrait' | 'landscape' = 'portrait') => {
     setDownloadingId(report.id);
     try {
-      // Fetch live submission values from database
-      const { data: valuesData } = await (supabase
-        .from('report_submission_values') as any)
-        .select(`
-          value_text,
-          value_numeric,
-          value_boolean,
-          value_date,
-          field_id,
-          form_fields (
-            label_en,
-            label_mr,
-            name
-          )
-        `)
-        .eq('submission_id', report.id);
-
-      const headers = [
-        language === 'mr' ? 'आरोग्य निर्देशक / बाब' : 'Metric / Indication',
-        language === 'mr' ? 'नोंदवलेली माहिती (Value)' : 'Reported Value',
-        language === 'mr' ? 'स्थिती' : 'Status'
-      ];
-
-      let data: any[][] = [];
-
-      if (valuesData && valuesData.length > 0) {
-        data = valuesData.map((val: any) => {
-          const label = language === 'mr' 
-            ? (val.form_fields?.label_mr || val.form_fields?.label_en || val.form_fields?.name || 'Indicator')
-            : (val.form_fields?.label_en || val.form_fields?.label_mr || val.form_fields?.name || 'Indicator');
-
-          let displayedVal = '';
-          if (val.value_numeric !== null && val.value_numeric !== undefined) displayedVal = String(val.value_numeric);
-          else if (val.value_boolean !== null && val.value_boolean !== undefined) displayedVal = val.value_boolean ? 'Yes (होय)' : 'No (नाही)';
-          else if (val.value_date) displayedVal = String(val.value_date);
-          else displayedVal = val.value_text || '-';
-
-          return [label, displayedVal, report.status || 'Submitted'];
-        });
-      } else {
-        data = [
-          ['Sub-centre Level Submission', 'Completed', report.status || 'Submitted'],
-          ['Reporting Village', report.villages?.name || report.employees?.sub_centres?.name || 'Sub-centre Area', 'Recorded'],
-          ['Submission Timestamp', report.submitted_at ? new Date(report.submitted_at).toLocaleString() : 'Draft', 'Verified']
-        ];
-      }
-
-      exportToPDF(headers, data, {
-        filename: `${report.forms?.name?.replace(/\s+/g, '_')}_${report.period_start}`,
-        title: report.forms?.name || 'Health Report',
-        district: 'District Health Office',
-        taluka: 'District Area',
-        phc: report.employees?.phcs?.name || 'PHC',
-        subcentre: report.employees?.sub_centres?.name || 'Sub-centre',
-        period: `${report.period_start} to ${report.period_end}`,
-        generatedBy: report.employees?.name || 'Staff'
+      const preparedData = await prepareReportData(report, language === 'mr' ? 'mr' : 'en');
+      exportStructuredReportToPDF(preparedData, {
+        orientation,
+        language: language === 'mr' ? 'mr' : 'en',
+        title: preparedData.formName,
+        district: preparedData.district,
+        taluka: preparedData.taluka,
+        phc: preparedData.phc,
+        subcentre: preparedData.subcentre,
+        village: preparedData.village,
+        period: `${preparedData.periodStart} to ${preparedData.periodEnd}`,
+        status: preparedData.status
       });
     } catch (err) {
       console.error('Error exporting PDF:', err);
@@ -324,28 +287,56 @@ export default function MyReports() {
 
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {isEditable && (
+                          <div className="flex items-center gap-1.5 justify-end">
+                            {/* Main Options / Preview Modal Button */}
                             <button 
-                              onClick={() => navigate(`/reports/submit/${report.form_id}/${report.id}`)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-md text-xs font-bold transition-colors"
-                              title={language === 'mr' ? 'अहवाल दुरुस्त करा' : 'Edit Report'}
+                              onClick={() => setSelectedReportForDownload(report)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all shadow-2xs"
+                              title={language === 'mr' ? 'A4 डाऊनलोड पर्याय (Portrait / Landscape)' : 'A4 Download Options (Portrait / Landscape)'}
                             >
-                              <Edit className="w-3.5 h-3.5" />
-                              {language === 'mr' ? 'दुरुस्त करा (Edit)' : 'Edit'}
+                              <Download className="w-3.5 h-3.5 text-blue-600" />
+                              {language === 'mr' ? 'डाऊनलोड / A4' : 'Download A4'}
                             </button>
-                          )}
-                          <button 
-                            onClick={() => handleDownloadPDF(report)}
-                            disabled={downloadingId === report.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-bold transition-colors disabled:opacity-50"
-                          >
-                            {downloadingId === report.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Download className="w-3.5 h-3.5" />
+
+                            {/* Quick Landscape PDF Button */}
+                            <button 
+                              onClick={() => handleDownloadPDF(report, 'landscape')}
+                              disabled={downloadingId === report.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                              title={language === 'mr' ? 'आडवा PDF (A4 Landscape)' : 'A4 Landscape PDF'}
+                            >
+                              {downloadingId === report.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <span className="text-[11px] font-bold">📑 A4 Landscape</span>
+                              )}
+                            </button>
+
+                            {/* Quick Portrait PDF Button */}
+                            <button 
+                              onClick={() => handleDownloadPDF(report, 'portrait')}
+                              disabled={downloadingId === report.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                              title={language === 'mr' ? 'उभा PDF (A4 Portrait)' : 'A4 Portrait PDF'}
+                            >
+                              {downloadingId === report.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <span className="text-[11px] font-bold">📄 A4 Portrait</span>
+                              )}
+                            </button>
+
+                            {isEditable && (
+                              <button 
+                                onClick={() => navigate(`/reports/submit/${report.form_id}/${report.id}`)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-colors ml-1"
+                                title={language === 'mr' ? 'अहवाल दुरुस्त करा' : 'Edit Report'}
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                                {language === 'mr' ? 'दुरुस्त करा' : 'Edit'}
+                              </button>
                             )}
-                            PDF
-                          </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -440,6 +431,15 @@ export default function MyReports() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Advanced A4 Portrait & Landscape Report Download & Preview Modal */}
+      {selectedReportForDownload && (
+        <ReportDownloadModal
+          isOpen={!!selectedReportForDownload}
+          report={selectedReportForDownload}
+          onClose={() => setSelectedReportForDownload(null)}
+        />
       )}
     </div>
   );
