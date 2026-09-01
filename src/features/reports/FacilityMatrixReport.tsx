@@ -940,9 +940,14 @@ export default function FacilityMatrixReport() {
       </div>
 
       {saveSuccess && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-          {language === 'mr' ? 'सर्व उपकेंद्रांची आकडेवारी यशस्वीरीत्या जतन झाली आहे!' : 'Facility matrix values saved successfully!'}
+        <div className="bg-emerald-50 border-2 border-emerald-300 text-emerald-900 px-5 py-3.5 rounded-xl text-sm font-bold flex items-center gap-3 shadow-xs animate-in fade-in">
+          <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div>{language === 'mr' ? 'डेटा Supabase मध्ये यशस्वीरीत्या जतन झाला आहे!' : 'Data saved successfully in Supabase'}</div>
+            <div className="text-xs text-emerald-700 font-medium">{language === 'mr' ? 'सर्व उपकेंद्रांची आकडेवारी Supabase क्लाउडवर जतन झाली.' : 'All facility statistics saved to Supabase cloud.'}</div>
+          </div>
         </div>
       )}
 
