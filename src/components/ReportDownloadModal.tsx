@@ -19,6 +19,7 @@ import { useLanguageStore } from '@/store/languageStore';
 import { prepareReportData, PreparedReportData, StructuredReportRow } from '@/utils/reportDataHelper';
 import { exportStructuredReportToPDF } from '@/utils/pdfExport';
 import { exportStructuredReportToExcel } from '@/utils/excelExport';
+import PrintPreviewModal from '@/components/PrintPreviewModal';
 
 interface ReportDownloadModalProps {
   report: any;
@@ -39,6 +40,7 @@ export default function ReportDownloadModal({
   const [reportData, setReportData] = useState<PreparedReportData | null>(null);
   const [downloading, setDownloading] = useState<boolean>(false);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+  const [showFullPrintPreview, setShowFullPrintPreview] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && report) {
@@ -525,17 +527,17 @@ export default function ReportDownloadModal({
 
                 <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                   <button
-                    onClick={handlePrint}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors shadow-2xs"
-                    title={language === 'mr' ? 'A4 प्रिंट करा' : 'Print A4 Document'}
+                    onClick={() => setShowFullPrintPreview(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                    title={language === 'mr' ? 'मुद्रण पूर्वावलोकन उघडा' : 'Open Dedicated Print Preview Mode'}
                   >
-                    <Printer className="w-3.5 h-3.5 text-slate-500" />
-                    {language === 'mr' ? 'A4 प्रिंट' : 'A4 Print'}
+                    <Printer className="w-3.5 h-3.5 text-blue-400" />
+                    {language === 'mr' ? 'प्रिंट प्रिव्ह्यू (Print Preview)' : 'Print Preview'}
                   </button>
 
                   <button
                     onClick={handleDownloadExcel}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition-colors shadow-2xs cursor-pointer"
                     title="Download Excel Sheet"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
@@ -545,7 +547,7 @@ export default function ReportDownloadModal({
                   <button
                     onClick={handleDownloadPDF}
                     disabled={downloading}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     {downloading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -553,8 +555,8 @@ export default function ReportDownloadModal({
                       <Download className="w-3.5 h-3.5" />
                     )}
                     {language === 'mr' 
-                      ? `PDF डाऊनलोड (A4 ${orientation === 'portrait' ? 'उभा' : 'आडवा'})` 
-                      : `Download A4 PDF (${orientation === 'portrait' ? 'Portrait' : 'Landscape'})`}
+                      ? `PDF डाऊनलोड (${orientation === 'portrait' ? 'उभा' : 'आडवा'})` 
+                      : `Download PDF (${orientation === 'portrait' ? 'Portrait' : 'Landscape'})`}
                   </button>
                 </div>
               </div>
@@ -567,6 +569,18 @@ export default function ReportDownloadModal({
 
         </div>
       </div>
+
+      {/* Dedicated Print Preview Modal with Full CSS Print Controls */}
+      {showFullPrintPreview && (
+        <PrintPreviewModal
+          isOpen={showFullPrintPreview}
+          onClose={() => setShowFullPrintPreview(false)}
+          reportData={reportData}
+          initialOrientation={orientation}
+          onDirectExcelExport={handleDownloadExcel}
+        />
+      )}
     </div>
   );
 }
+

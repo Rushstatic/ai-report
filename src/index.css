@@ -11,3 +11,169 @@
 .compact-mode label {
   font-size: 0.65rem !important;
 }
+
+/* ==========================================================================
+   CSS PRINT MEDIA QUERIES & DEDICATED REPORT PRINT STYLES
+   ========================================================================== */
+
+:root {
+  --print-margin: 8mm;
+}
+
+@page {
+  size: auto;
+  margin: var(--print-margin, 8mm);
+}
+
+@page print-portrait {
+  size: A4 portrait;
+  margin: var(--print-margin, 8mm);
+}
+
+@page print-landscape {
+  size: A4 landscape;
+  margin: var(--print-margin, 8mm);
+}
+
+@page print-legal-portrait {
+  size: legal portrait;
+  margin: var(--print-margin, 8mm);
+}
+
+@page print-legal-landscape {
+  size: legal landscape;
+  margin: var(--print-margin, 8mm);
+}
+
+/* Print Specific Rules */
+@media print {
+  /* Hide non-printable elements */
+  .no-print,
+  nav,
+  header,
+  aside,
+  .sidebar,
+  button:not(.allow-print),
+  .no-print-zone,
+  .modal-backdrop:not(.print-preview-backdrop),
+  [role="dialog"]:not(.print-active-dialog) {
+    display: none !important;
+  }
+
+  /* Force background colors, borders, and fills to render exactly */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    text-shadow: none !important;
+  }
+
+  /* Reset document flow for print */
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    overflow: visible !important;
+  }
+
+  /* Printable container full reset */
+  .printable-document,
+  .print-page-sheet {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* Page orientation classes applied to containers */
+  .print-page-sheet.orientation-portrait {
+    page: print-portrait;
+  }
+
+  .print-page-sheet.orientation-landscape {
+    page: print-landscape;
+  }
+
+  .print-page-sheet.orientation-legal-portrait {
+    page: print-legal-portrait;
+  }
+
+  .print-page-sheet.orientation-legal-landscape {
+    page: print-legal-landscape;
+  }
+
+  /* Table formatting & multi-page repetitions */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr, .print-row {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+
+  th, td {
+    border-color: #94a3b8 !important;
+  }
+
+  /* Headers and Section Breaks */
+  h1, h2, h3, h4, h5, h6, .print-section-header {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    break-after: avoid-page !important;
+  }
+
+  /* Avoid orphaned blocks and signature cuts */
+  .sig-block,
+  .sig-box,
+  .print-card,
+  .kpi-box,
+  .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+
+  /* Force page break helper */
+  .page-break,
+  .print-page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+    height: 0 !important;
+    display: block !important;
+  }
+
+  /* Monochromatic print mode override if requested */
+  .print-monochrome * {
+    color: #000000 !important;
+    border-color: #64748b !important;
+  }
+  .print-monochrome th {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+  }
+}

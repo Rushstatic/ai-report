@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import PrintPreviewModal from '@/components/PrintPreviewModal';
 
 interface MetricColumn {
   id: string;
@@ -58,6 +59,7 @@ export default function FacilityMatrixReport() {
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   // Standard Sub-centres under PHC Bhada as shown in sample
   const defaultFacilities: FacilityRow[] = [
@@ -595,11 +597,19 @@ export default function FacilityMatrixReport() {
           </button>
 
           <button
-            onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+            onClick={() => setShowPrintPreview(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
           >
-            <Printer className="w-3.5 h-3.5" />
-            {language === 'mr' ? 'प्रिंट / A4 Print' : 'Print View'}
+            <Printer className="w-3.5 h-3.5 text-blue-400" />
+            {language === 'mr' ? 'प्रिंट प्रिव्ह्यू (Print Preview)' : 'Print Preview Mode'}
+          </button>
+
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            {language === 'mr' ? 'थेट प्रिंट' : 'Quick Print'}
           </button>
 
           <button
@@ -607,7 +617,7 @@ export default function FacilityMatrixReport() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs"
           >
             <Download className="w-3.5 h-3.5" />
-            {language === 'mr' ? 'PDF डाऊनलोड' : 'Export PDF'}
+            PDF
           </button>
 
           <button
@@ -827,6 +837,135 @@ export default function FacilityMatrixReport() {
           </p>
         </div>
       </div>
+
+      {/* Dedicated Print Preview Modal with Full CSS Print Controls */}
+      {showPrintPreview && (
+        <PrintPreviewModal
+          isOpen={showPrintPreview}
+          onClose={() => setShowPrintPreview(false)}
+          customReportTitle={`${selectedPhcName} ${selectedFormTitle}`}
+          customSubTitle={`Report for ${formattedDate()}`}
+          initialOrientation="landscape"
+          onDirectExcelExport={handleDownloadExcel}
+          customContent={
+            <div className="space-y-4">
+              {/* Header block */}
+              <div className="text-center pb-2 border-b-2 border-slate-900">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  महाराष्ट्र शासन • सार्वजनिक आरोग्य विभाग
+                </div>
+                <h2 className="text-lg font-extrabold text-slate-950 mt-1">
+                  {selectedPhcName} {selectedFormTitle}
+                </h2>
+                <p className="text-xs font-semibold text-slate-600">
+                  Report for {formattedDate()}
+                </p>
+              </div>
+
+              {/* Printable Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-slate-400 text-center text-[10px]">
+                  <thead>
+                    <tr className="bg-slate-100 font-bold text-slate-800">
+                      <th rowSpan={3} className="border border-slate-400 px-2 py-1.5 w-8">Sr No</th>
+                      <th rowSpan={3} className="border border-slate-400 px-3 py-1.5 min-w-[150px] text-left">Name Of Health Center</th>
+                      <th colSpan={2} className="border border-slate-400 px-2 py-1">Scrub Typhus Cases</th>
+                      <th colSpan={8} className="border border-slate-400 px-2 py-1">Tests Conducted</th>
+                      <th colSpan={8} className="border border-slate-400 px-2 py-1">Positive Cases</th>
+                      <th colSpan={2} className="border border-slate-400 px-2 py-1">Deaths</th>
+                    </tr>
+                    <tr className="bg-slate-50 font-semibold text-[9px] text-slate-600">
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">RDK Tests</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">Weil-Felix Tests</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">ELISA IgM Tests</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1 font-bold">Total Tests</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">RDK Positive</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">Weil-Felix Positive</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1">ELISA IgM Positive</th>
+                      <th colSpan={2} className="border border-slate-400 px-1 py-1 font-bold">Total Positive</th>
+                    </tr>
+                    <tr className="bg-slate-50 font-medium text-[8.5px] text-slate-500">
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5 font-bold">Pro</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Daily</th>
+                      <th className="border border-slate-400 px-1 py-0.5">Pro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {facilities.map((fac) => (
+                      <tr key={fac.id} className="hover:bg-slate-50 print-row">
+                        <td className="border border-slate-400 px-1 py-1 text-center font-medium">{fac.srNo}</td>
+                        <td className={`border border-slate-400 px-2 py-1 text-left font-bold ${fac.isPhcHq ? 'text-blue-900 bg-blue-50/20' : 'text-slate-800'}`}>
+                          {language === 'mr' ? fac.nameMr : fac.nameEn}
+                        </td>
+                        {metricColumns.map((col) => (
+                          <td key={col.id} className="border border-slate-400 px-1 py-1 text-center font-medium">
+                            {fac.values[col.id] !== undefined ? fac.values[col.id] : 0}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-100 font-bold border-t-2 border-b-2 border-slate-600">
+                      <td colSpan={2} className="border border-slate-400 px-2 py-1.5 text-center font-extrabold text-slate-900">Total</td>
+                      {metricColumns.map((col) => (
+                        <td key={col.id} className="border border-slate-400 px-1 py-1.5 text-center font-extrabold text-slate-950">
+                          {calculateTotal(col.id)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Defaulter Alert */}
+              <div className="pt-2">
+                <p className="text-xs font-bold text-red-600">
+                  <span className="underline mr-1">
+                    {language === 'mr' ? 'आज अहवाल सादर न करणाऱ्या आरोग्य संस्था :' : 'Health institutions that did not submit report today :'}
+                  </span>
+                  {nonReportingListText || (language === 'mr' ? 'निरंक (सर्व उपकेंद्रांनी अहवाल सादर केला)' : 'Nil (All reported)')}
+                </p>
+              </div>
+
+              {/* Signatures */}
+              <div className="pt-8 flex justify-between items-end avoid-break text-[10px] text-slate-700">
+                <div className="text-center w-44 sig-box">
+                  <div className="h-8"></div>
+                  <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                    {language === 'mr' ? 'वैद्यकीय अधिकारी स्वाक्षरी' : 'Medical Officer Sign'}
+                  </div>
+                  <div className="text-slate-500 text-[9px]">{selectedPhcName}</div>
+                </div>
+
+                <div className="text-center w-44 sig-box">
+                  <div className="h-8"></div>
+                  <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                    {language === 'mr' ? 'तालुका आरोग्य अधिकारी (THO)' : 'Taluka Health Officer (THO)'}
+                  </div>
+                  <div className="text-slate-500 text-[9px]">स्वाक्षरी व शिक्का</div>
+                </div>
+              </div>
+            </div>
+          }
+        />
+      )}
     </div>
   );
 }
+
