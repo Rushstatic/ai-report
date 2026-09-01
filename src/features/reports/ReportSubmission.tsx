@@ -11,7 +11,10 @@ import {
   CheckCircle2, 
   FileText,
   UserCheck,
-  Download
+  Download,
+  Layers,
+  Sparkles,
+  Calculator
 } from 'lucide-react';
 import ReportDownloadModal from '@/components/ReportDownloadModal';
 import { supabase } from '@/lib/supabase';
@@ -491,121 +494,214 @@ export default function ReportSubmission() {
     return roots;
   };
 
-  const renderReportFieldNode = (field: FormField, depth: number = 0): React.ReactNode => {
+  const renderReportFieldNode = (field: FormField, depth: number = 0, subIndex?: string): React.ReactNode => {
     const hasChildren = field.children && field.children.length > 0;
 
     if (hasChildren) {
       return (
-        <div key={field.id} className={`my-4 border border-slate-200 rounded-lg overflow-hidden shadow-sm ${depth > 0 ? 'ml-2 sm:ml-6 mt-4 border-l-4 border-l-blue-400' : 'bg-white'}`}>
-          <div className="bg-slate-100/70 px-4 py-3 border-b border-slate-200">
-            <h3 className="font-bold text-slate-800 text-sm">
-              {language === 'mr' ? field.label_mr : field.label_en}
-              <span className="text-slate-500 font-normal ml-2 text-xs">
-                ({language === 'mr' ? field.label_en : field.label_mr})
+        <div 
+          key={field.id} 
+          className={`my-5 rounded-xl border-2 overflow-hidden shadow-xs transition-all ${
+            depth > 0 
+              ? 'ml-2 sm:ml-6 border-indigo-200 bg-indigo-50/20' 
+              : 'border-blue-200/90 bg-slate-50/50'
+          }`}
+        >
+          {/* Shaded Group Header */}
+          <div className="bg-gradient-to-r from-slate-100 via-slate-100 to-blue-50/60 px-4 py-3.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center flex-shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                  {language === 'mr' ? field.label_mr || field.label_en : field.label_en || field.label_mr}
+                  <span className="text-slate-500 font-normal text-xs">
+                    ({language === 'mr' ? field.label_en : field.label_mr})
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {language === 'mr' ? 'खालील सर्व उप-प्रश्नांची माहिती भरा' : 'Fill all nested subfield indicators below'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                📁 {language === 'mr' ? 'मुख्य गट' : 'Group Header'}
               </span>
-            </h3>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
+              </span>
+            </div>
           </div>
-          <div className="p-4 sm:p-5 space-y-5 bg-white">
-            {field.children!.map(child => renderReportFieldNode(child, depth + 1))}
+
+          {/* Shaded Content Container with isolated child cards */}
+          <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
+            <div className="grid grid-cols-1 gap-3.5">
+              {field.children!.map((child, childIdx) => (
+                <div 
+                  key={child.id} 
+                  className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs hover:border-blue-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all"
+                >
+                  {renderReportFieldNode(child, depth + 1, `${childIdx + 1}`)}
+                </div>
+              ))}
+            </div>
           </div>
+        </div>
+      );
+    }
+
+    const isLeafInStandalone = depth === 0;
+
+    const content = (
+      <div className="space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <label htmlFor={field.id} className="block text-sm font-semibold text-slate-800 leading-snug">
+            {subIndex && (
+              <span className="inline-flex items-center justify-center h-5 px-1.5 rounded bg-blue-50 text-blue-700 text-xs font-bold mr-2 border border-blue-200">
+                ↳ {subIndex}
+              </span>
+            )}
+            {language === 'mr' ? field.label_mr || field.label_en : field.label_en || field.label_mr}
+            <span className="text-slate-400 font-normal ml-1.5 text-xs">
+              ({language === 'mr' ? field.label_en : field.label_mr})
+            </span>
+            {field.is_required && <span className="text-red-500 ml-1 font-bold">*</span>}
+          </label>
+
+          {field.field_type === 'Auto Calculated Field' && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
+              <Calculator className="w-3 h-3" />
+              {language === 'mr' ? 'स्वयंचलित गणना' : 'Calculated'}
+            </span>
+          )}
+
+          {field.field_type === 'Master Data Field' && (
+            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200 whitespace-nowrap">
+              {language === 'mr' ? 'मास्टर डेटा' : 'Master Data'}
+            </span>
+          )}
+        </div>
+
+        {(field.field_type === 'Master Data Field' || field.field_type === 'Auto Calculated Field' || field.field_type === 'Read-only Field') && (
+          <div className={`w-full px-3.5 py-2.5 border rounded-lg text-sm ${
+            field.field_type === 'Master Data Field' 
+              ? 'border-purple-200 text-purple-900 bg-purple-50/80 font-semibold' 
+              : field.field_type === 'Auto Calculated Field'
+              ? 'border-amber-200 text-amber-900 bg-amber-50/80 font-bold font-mono text-base'
+              : 'border-slate-200 text-slate-600 bg-slate-100'
+          }`}>
+            {formData[field.id] !== undefined && formData[field.id] !== '' 
+              ? formData[field.id] 
+              : (field.field_type === 'Master Data Field' ? (language === 'mr' ? 'आपोआप भरले जाईल' : 'Auto-populated') : '-')}
+          </div>
+        )}
+
+        {(field.field_type === 'Number' || field.field_type === 'Decimal') && (
+          <input
+            type="number"
+            step={field.field_type === 'Decimal' ? '0.01' : '1'}
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder="0"
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
+        {(field.field_type === 'Text' || field.field_type === 'Mobile Number') && (
+          <input
+            type={field.field_type === 'Mobile Number' ? 'tel' : 'text'}
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder={field.field_type === 'Mobile Number' ? '10-digit mobile number' : (language === 'mr' ? 'माहिती प्रविष्ट करा...' : 'Enter details...')}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
+        {field.field_type === 'Long Text' && (
+          <textarea
+            id={field.id}
+            required={field.is_required}
+            rows={3}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            placeholder={language === 'mr' ? 'सविस्तर माहिती प्रविष्ट करा...' : 'Enter detailed description...'}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
+        {field.field_type === 'Date' && (
+          <input
+            type="date"
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          />
+        )}
+
+        {field.field_type === 'Yes/No' && (
+          <div className="flex items-center gap-6 pt-1">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="radio"
+                name={field.id}
+                checked={formData[field.id] === 'yes'}
+                onChange={() => handleInputChange(field.id, 'yes')}
+                className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+              />
+              <span>{language === 'mr' ? 'होय (Yes)' : 'Yes (होय)'}</span>
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="radio"
+                name={field.id}
+                checked={formData[field.id] === 'no'}
+                onChange={() => handleInputChange(field.id, 'no')}
+                className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
+              />
+              <span>{language === 'mr' ? 'नाही (No)' : 'No (नाही)'}</span>
+            </label>
+          </div>
+        )}
+
+        {field.field_type === 'Dropdown' && (
+          <select
+            id={field.id}
+            required={field.is_required}
+            value={formData[field.id] !== undefined ? formData[field.id] : ''}
+            onChange={(e) => handleInputChange(field.id, e.target.value)}
+            className="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            <option value="">{language === 'mr' ? '-- निवडा --' : '-- Select --'}</option>
+            {field.options?.map((opt) => (
+              <option key={opt.id} value={opt.value}>
+                {language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    );
+
+    if (isLeafInStandalone) {
+      return (
+        <div key={field.id} className="bg-white rounded-xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
+          {content}
         </div>
       );
     }
 
     return (
       <React.Fragment key={field.id}>
-        <div className={`space-y-1.5 ${depth > 0 ? 'mt-4' : ''}`}>
-          <label htmlFor={field.id} className="block text-sm font-semibold text-slate-700">
-            {language === 'mr' ? field.label_mr : field.label_en}
-            <span className="text-slate-400 font-normal ml-2 text-xs">
-              ({language === 'mr' ? field.label_en : field.label_mr})
-            </span>
-            {field.is_required && <span className="text-red-500 ml-1 font-bold">*</span>}
-          </label>
-
-          {(field.field_type === 'Master Data Field' || field.field_type === 'Auto Calculated Field' || field.field_type === 'Read-only Field') && (
-            <div className={`w-full px-3 py-2 border rounded-lg text-sm bg-slate-100 ${field.field_type === 'Master Data Field' ? 'border-purple-200 text-purple-900 bg-purple-50 font-semibold' : 'border-slate-200 text-slate-600'}`}>
-              {formData[field.id] !== undefined && formData[field.id] !== '' ? formData[field.id] : (field.field_type === 'Master Data Field' ? (language === 'mr' ? 'आपोआप भरले जाईल' : 'Auto-populated') : '-')}
-            </div>
-          )}
-
-          {field.field_type === 'Number' && (
-            <input
-              type="number"
-              id={field.id}
-              required={field.is_required}
-              value={formData[field.id] !== undefined ? formData[field.id] : ''}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              placeholder="0"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            />
-          )}
-
-          {field.field_type === 'Text' && (
-            <input
-              type="text"
-              id={field.id}
-              required={field.is_required}
-              value={formData[field.id] !== undefined ? formData[field.id] : ''}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              placeholder={language === 'mr' ? 'माहिती प्रविष्ट करा...' : 'Enter details...'}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            />
-          )}
-
-          {field.field_type === 'Date' && (
-            <input
-              type="date"
-              id={field.id}
-              required={field.is_required}
-              value={formData[field.id] !== undefined ? formData[field.id] : ''}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            />
-          )}
-
-          {field.field_type === 'Yes/No' && (
-            <div className="flex items-center gap-6 mt-1">
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name={field.id}
-                  checked={formData[field.id] === 'yes'}
-                  onChange={() => handleInputChange(field.id, 'yes')}
-                  className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                />
-                <span>{language === 'mr' ? 'होय (Yes)' : 'Yes (होय)'}</span>
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name={field.id}
-                  checked={formData[field.id] === 'no'}
-                  onChange={() => handleInputChange(field.id, 'no')}
-                  className="text-blue-600 focus:ring-blue-500 h-4 w-4 border-slate-300"
-                />
-                <span>{language === 'mr' ? 'नाही (No)' : 'No (नाही)'}</span>
-              </label>
-            </div>
-          )}
-
-          {field.field_type === 'Dropdown' && (
-            <select
-              id={field.id}
-              required={field.is_required}
-              value={formData[field.id] !== undefined ? formData[field.id] : ''}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="">{language === 'mr' ? '-- निवडा --' : '-- Select --'}</option>
-              {field.options?.map((opt) => (
-                <option key={opt.id} value={opt.value}>
-                  {language === 'mr' ? opt.label_mr || opt.label_en : opt.label_en}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        {content}
       </React.Fragment>
     );
   };

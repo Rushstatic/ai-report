@@ -674,32 +674,58 @@ export default function FormBuilder() {
   };
 
 
-  const renderPreviewFieldNode = (field: FormFieldItem, depth: number = 0): React.ReactNode => {
+  const renderPreviewFieldNode = (field: FormFieldItem, depth: number = 0, subIndex?: string): React.ReactNode => {
     const hasChildren = field.children && field.children.length > 0;
 
     if (hasChildren) {
       return (
-        <div key={field.id} className={`my-4 border border-slate-200 rounded-lg overflow-hidden shadow-sm ${depth > 0 ? 'ml-2 sm:ml-6 mt-4 border-l-4 border-l-blue-400' : 'bg-white'}`}>
-          <div className="bg-slate-100/70 px-4 py-3 border-b border-slate-200">
-            <h3 className="font-bold text-slate-800 text-sm">
-              {language === 'mr' ? field.labelMr || field.labelEn : field.labelEn || field.labelMr}
-              <span className="text-slate-500 font-normal ml-2 text-xs">
-                ({language === 'mr' ? field.labelEn : field.labelMr})
+        <div key={field.id} className={`my-5 border-2 rounded-xl overflow-hidden shadow-xs transition-all ${depth > 0 ? 'ml-2 sm:ml-6 border-indigo-200 bg-indigo-50/20' : 'border-blue-200/90 bg-slate-50/50'}`}>
+          <div className="bg-gradient-to-r from-slate-100 via-slate-100 to-blue-50/60 px-4 py-3.5 border-b border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center flex-shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                  {language === 'mr' ? field.labelMr || field.labelEn : field.labelEn || field.labelMr}
+                  <span className="text-slate-500 font-normal ml-2 text-xs">
+                    ({language === 'mr' ? field.labelEn : field.labelMr})
+                  </span>
+                </h3>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                📁 {language === 'mr' ? 'मुख्य गट' : 'Group Header'}
               </span>
-            </h3>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">
+                {field.children!.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
+              </span>
+            </div>
           </div>
-          <div className="p-4 sm:p-5 space-y-5 bg-white">
-            {field.children!.map(child => renderPreviewFieldNode(child, depth + 1))}
+          <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/30">
+            <div className="grid grid-cols-1 gap-3">
+              {field.children!.map((child, childIdx) => (
+                <div key={child.id} className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs">
+                  {renderPreviewFieldNode(child, depth + 1, `${childIdx + 1}`)}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div key={field.id} className={`space-y-1.5 ${depth > 0 ? 'mt-4' : ''}`}>
-        <label className="block text-sm font-semibold text-slate-700">
+      <div key={field.id} className="space-y-1.5">
+        <label className="block text-sm font-semibold text-slate-800">
+          {subIndex && (
+            <span className="inline-flex items-center justify-center h-5 px-1.5 rounded bg-blue-50 text-blue-700 text-xs font-bold mr-2 border border-blue-200">
+              ↳ {subIndex}
+            </span>
+          )}
           {language === 'mr' ? field.labelMr || field.labelEn : field.labelEn || field.labelMr}
-          <span className="text-slate-400 font-normal ml-2 text-xs">
+          <span className="text-slate-400 font-normal ml-1.5 text-xs">
             ({language === 'mr' ? field.labelEn : field.labelMr})
           </span>
           {field.required && <span className="text-red-500 ml-1 font-bold">*</span>}
@@ -756,46 +782,56 @@ export default function FormBuilder() {
     );
   };
 
-  const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0): React.ReactNode => (
+  const renderFieldNode = (field: FormFieldItem, index: number, depth: number = 0, indexPrefix?: string): React.ReactNode => (
   <React.Fragment key={field.id}>
     <div 
-      style={{ marginLeft: compactMode ? `${depth * 1}rem` : `${depth * 2}rem` }}
-      className={`relative bg-slate-50/80 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-start hover:border-blue-300 transition-all shadow-xs ${compactMode ? 'p-2 gap-2' : 'p-4 gap-4'}`}
+      style={{ marginLeft: compactMode ? `${depth * 0.75}rem` : `${depth * 1.5}rem` }}
+      className={`relative rounded-xl flex flex-col sm:flex-row items-start transition-all shadow-xs ${
+        depth > 0 
+          ? 'bg-white border-2 border-indigo-200/90 border-l-4 border-l-indigo-600 hover:border-indigo-400' 
+          : field.allow_sub_fields || (field.children && field.children.length > 0)
+          ? 'bg-blue-50/30 border-2 border-blue-300 hover:border-blue-400'
+          : 'bg-slate-50/80 border border-slate-200 hover:border-blue-300'
+      } ${compactMode ? 'p-2.5 gap-2' : 'p-4 gap-4'}`}
       draggable={true}
       onDragStart={(e) => handleDragStart(e, field.id)}
       onDragOver={(e) => handleDragOver(e, field.allow_sub_fields || false)}
       onDragLeave={handleDragLeave}
       onDrop={(e) => handleDrop(e, field.id, field.allow_sub_fields || false)}
     >
-                    {/* Index & Reorder */}
-                    <div className="flex sm:flex-col items-center gap-1">
-                      <div className="text-slate-300 cursor-move hover:text-blue-500 mb-1" title="Drag to reorder/reparent">
-                        <GripVertical className="h-4 w-4" />
-                      </div>
-                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
-                        {index + 1}
-                      </span>
-                      <div className="flex sm:flex-col gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => moveField(field.id, 'up')}
-                          disabled={index === 0}
-                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
-                          title="Move Up"
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveField(field.id, 'down')}
-                          disabled={index === fields.length - 1}
-                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
-                          title="Move Down"
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+      {/* Index & Reorder */}
+      <div className="flex sm:flex-col items-center gap-1">
+        <div className="text-slate-300 cursor-move hover:text-blue-500 mb-1" title="Drag to reorder/reparent">
+          <GripVertical className="h-4 w-4" />
+        </div>
+        <span className={`inline-flex items-center justify-center rounded-full text-xs font-bold ${
+          indexPrefix 
+            ? 'h-6 px-1.5 bg-indigo-100 text-indigo-800 border border-indigo-200' 
+            : 'h-6 w-6 bg-blue-100 text-blue-800'
+        }`}>
+          {indexPrefix || index + 1}
+        </span>
+        <div className="flex sm:flex-col gap-0.5">
+          <button
+            type="button"
+            onClick={() => moveField(field.id, 'up')}
+            disabled={index === 0}
+            className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
+            title="Move Up"
+          >
+            <ArrowUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => moveField(field.id, 'down')}
+            disabled={index === fields.length - 1}
+            className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-25"
+            title="Move Down"
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
 
                     {/* Inputs */}
                     <div className="flex-1 w-full grid grid-cols-1 gap-y-3 gap-x-4 sm:grid-cols-12">
@@ -1245,10 +1281,47 @@ export default function FormBuilder() {
                       )}
                     </div>
                   </div>
-                    {/* Render Children */}
+                    {/* Render Children in Isolated Shaded Container */}
                     {field.children && field.children.length > 0 && (
-                      <div className="w-full mt-4 space-y-4 border-l-2 border-blue-200 pl-4">
-                        {field.children.map((child, childIdx) => renderFieldNode(child, childIdx, depth + 1))}
+                      <div 
+                        style={{ marginLeft: compactMode ? `${depth * 0.75}rem` : `${depth * 1.5}rem` }}
+                        className="w-full mt-3 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/20 p-3 sm:p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between border-b border-blue-200/70 pb-2 px-1">
+                          <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+                            <Layers className="w-4 h-4 text-blue-600" />
+                            <span>
+                              {language === 'mr' 
+                                ? `📁 उप-निर्देशक गट: "${field.labelMr || field.labelEn || 'गट'}"` 
+                                : `📁 Subfield Group: "${field.labelEn || field.labelMr || 'Group'}"`}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
+                            {field.children.length} {language === 'mr' ? 'उप-प्रश्न' : 'Subfields'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {field.children.map((child, childIdx) => 
+                            renderFieldNode(
+                              child, 
+                              childIdx, 
+                              depth + 1, 
+                              `${indexPrefix ? `${indexPrefix}.` : `${index + 1}.`}${childIdx + 1}`
+                            )
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-blue-200/60 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => addField(field.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            {language === 'mr' ? '+ या गटात नवीन उप-निर्देशक जोडा' : '+ Add Subfield in this Group'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </React.Fragment>
