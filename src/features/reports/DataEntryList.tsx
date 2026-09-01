@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
-import { fetchAllActiveForms } from '@/utils/formStorage';
+import { fetchAllActiveForms, filterOutDeletedSubmissions } from '@/utils/formStorage';
 
 interface FormItem {
   id: string;
@@ -75,7 +75,7 @@ export default function DataEntryList() {
           .order('submitted_at', { ascending: false });
 
         if (subData) {
-          setSubmissions(subData);
+          setSubmissions(filterOutDeletedSubmissions(subData));
         }
       }
     } catch (err) {

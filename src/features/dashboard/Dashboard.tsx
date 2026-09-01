@@ -20,6 +20,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { exportToExcel } from '@/utils/excelExport';
+import { filterOutDeletedSubmissions } from '@/utils/formStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
 import { useAuth } from '@/hooks/useAuth';
@@ -137,7 +138,7 @@ export default function Dashboard() {
           }
 
           const { data: allSubmissions } = await subQuery;
-          const subs: any[] = allSubmissions || [];
+          const subs: any[] = filterOutDeletedSubmissions(allSubmissions || []);
 
           // 4. Calculate live metrics
           const submittedCount = subs.filter(s => s.status === 'Submitted' || s.status === 'Approved').length;

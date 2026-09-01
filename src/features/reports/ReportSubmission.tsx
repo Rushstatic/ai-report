@@ -25,7 +25,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguageStore } from '@/store/languageStore';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
-import { getFormWithFields } from '@/utils/formStorage';
+import { getFormWithFields, filterOutDeletedSubmissions } from '@/utils/formStorage';
 
 type FieldType = 'Text' | 'Number' | 'Date' | 'Dropdown' | 'Yes/No' | 'Auto Calculated Field' | 'Read-only Field' | 'Master Data Field';
 
@@ -204,7 +204,7 @@ export default function ReportSubmission() {
             .eq('sub_centre_id', employee.sub_centre_id);
 
           if (subRecs) {
-            setExistingSubmissions(subRecs);
+            setExistingSubmissions(filterOutDeletedSubmissions(subRecs));
           }
         } else {
           // Controller or General user

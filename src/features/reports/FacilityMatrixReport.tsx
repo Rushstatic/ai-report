@@ -27,7 +27,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import PrintPreviewModal from '@/components/PrintPreviewModal';
-import { fetchAllActiveForms, getFormWithFields, StoredForm, FormFieldItem, buildFieldTree } from '@/utils/formStorage';
+import { fetchAllActiveForms, getFormWithFields, StoredForm, FormFieldItem, buildFieldTree, filterOutDeletedSubmissions } from '@/utils/formStorage';
 import { syncStandardFormsToDatabase } from '@/utils/syncForms';
 
 export interface DynamicMatrixColumn {
@@ -369,7 +369,8 @@ export default function FacilityMatrixReport() {
           // Date filter: submissions encompassing or matching selectedDate
           query = query.lte('period_start', selectedDate).gte('period_end', selectedDate);
 
-          const { data: subs, error: subErr } = await query;
+          const { data: rawSubs, error: subErr } = await query;
+          const subs = filterOutDeletedSubmissions(rawSubs || []);
 
           if (!subErr && subs && subs.length > 0) {
             const subIds = subs.map((s: any) => s.id);

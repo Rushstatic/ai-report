@@ -24,7 +24,7 @@ import { exportStructuredReportToExcel } from '@/utils/excelExport';
 import { prepareReportData } from '@/utils/reportDataHelper';
 import ReportDownloadModal from '@/components/ReportDownloadModal';
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
-import { deleteReportSubmission } from '@/utils/formStorage';
+import { deleteReportSubmission, filterOutDeletedSubmissions } from '@/utils/formStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
 import { supabase } from '@/lib/supabase';
@@ -87,7 +87,7 @@ export default function MyReports() {
         const { data, error } = await query;
 
         if (!error && data) {
-          setReports(data);
+          setReports(filterOutDeletedSubmissions(data));
         } else {
           setReports([]);
         }

@@ -4,6 +4,7 @@ import { useLanguageStore } from '@/store/languageStore';
 import { useAuth } from '@/hooks/useAuth';
 import { Search, Download, AlertCircle, Clock } from 'lucide-react';
 import { exportToExcel } from '@/utils/excelExport';
+import { filterOutDeletedSubmissions } from '@/utils/formStorage';
 
 export default function PendingReports() {
   const { language } = useLanguageStore();
@@ -40,7 +41,7 @@ export default function PendingReports() {
         const { data, error } = await query;
           
         if (data && data.length > 0) {
-          setPendingList(data);
+          setPendingList(filterOutDeletedSubmissions(data));
         } else {
           setPendingList([]);
         }
