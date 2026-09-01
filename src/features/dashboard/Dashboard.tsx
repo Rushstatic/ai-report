@@ -241,10 +241,10 @@ export default function Dashboard() {
               `)
               .eq('sub_centre_id', employee.sub_centre_id)
               .order('submitted_at', { ascending: false })
-              .limit(5);
+              .limit(20); // fetch more to account for local filtering
 
             if (subs) {
-              setRecentSubmissions(subs);
+              setRecentSubmissions(filterOutDeletedSubmissions(subs).slice(0, 5));
             }
           }
 
