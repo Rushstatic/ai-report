@@ -567,50 +567,73 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.totalFacilities')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.phcs} / {stats.subcentres}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 bg-slate-100 rounded text-slate-500 font-medium">{t('dash.phcsScs')}</span>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{t('dash.totalFacilities')}</p>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Building2 className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{stats.phcs} <span className="text-base font-medium text-slate-400">/</span> {stats.subcentres}</p>
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <span className="text-[11px] px-2 py-0.5 bg-slate-100 rounded-md text-slate-600 font-medium">{t('dash.phcsScs')}</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.totalEmployees')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.employees}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 bg-slate-100 rounded text-slate-500 font-medium">{t('dash.activeStaff')}</span>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{t('dash.totalEmployees')}</p>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{stats.employees}</p>
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <span className="text-[11px] px-2 py-0.5 bg-slate-100 rounded-md text-slate-600 font-medium">{t('dash.activeStaff')}</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{t('dash.expectedReports')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.expectedReports.toLocaleString()}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 bg-slate-100 rounded text-slate-500 font-medium">{t('dash.currentMonth')}</span>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{t('dash.expectedReports')}</p>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">{stats.expectedReports.toLocaleString()}</p>
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <span className="text-[11px] px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md font-medium">{t('dash.currentMonth')}</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider text-emerald-600">{t('dash.submitted')}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{stats.submittedReports.toLocaleString()}</p>
-          <div className="mt-2 flex items-center gap-2 text-emerald-600">
-            <span className="text-xs font-bold">{stats.complianceRate}%</span>
-            <span className="text-[10px] text-slate-400">{t('dash.compliance')}</span>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-emerald-700 text-xs font-semibold uppercase tracking-wider">{t('dash.submitted')}</p>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-700 mt-2">{stats.submittedReports.toLocaleString()}</p>
+          <div className="mt-2.5 flex items-center gap-2">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">{stats.complianceRate}%</span>
+            <span className="text-[11px] text-slate-500">{t('dash.compliance')}</span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Chart */}
-        <div className="col-span-1 lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+        <div className="col-span-1 lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-800">{t('dash.chartTitle')}</h3>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">{t('dash.chartTitle')}</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Submitted vs pending distribution across talukas</p>
+            </div>
             <button 
               onClick={handleExportCompliance}
-              className="flex items-center gap-1 text-blue-600 text-xs font-bold border border-blue-200 px-3 py-1 rounded hover:bg-blue-50"
+              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-semibold border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50/80 transition-colors cursor-pointer"
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
               {t('dash.exportDetail')}
             </button>
           </div>
@@ -622,11 +645,14 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="submitted" name="Submitted" stackId="a" fill="#3b82f6" radius={[0, 0, 4, 4]} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                  <Tooltip 
+                    cursor={{fill: '#f8fafc'}}
+                    contentStyle={{borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.06)'}}
+                  />
+                  <Bar dataKey="submitted" name="Submitted" stackId="a" fill="#2563eb" radius={[0, 0, 4, 4]} />
                   <Bar dataKey="pending" name="Pending" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -635,10 +661,13 @@ export default function Dashboard() {
         </div>
 
         {/* Pending Reports List */}
-        <div className="col-span-1 lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
-          <div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 text-sm">{t('dash.whoNotSubmitted')}</h3>
-            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
+        <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col overflow-hidden">
+          <div className="bg-slate-50/80 border-b border-slate-200/80 p-4 flex justify-between items-center">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">{t('dash.whoNotSubmitted')}</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">Critical pending submissions</p>
+            </div>
+            <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-md border border-amber-200/60">
               {stats.pendingReports} {t('dash.critical')}
             </span>
           </div>
@@ -649,24 +678,26 @@ export default function Dashboard() {
               </div>
             ) : (
               <table className="w-full text-left">
-                <thead className="sticky top-0 bg-white border-b border-slate-100">
+                <thead className="sticky top-0 bg-white border-b border-slate-100 z-5">
                   <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                     <th className="px-4 py-3">{t('dash.colPhc')}</th>
                     <th className="px-4 py-3">{t('dash.colEmployee')}</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="text-xs">
+                <tbody className="text-xs divide-y divide-slate-50">
                   {pendingList.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-slate-800">
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-slate-800">
                         {item.employees?.sub_centres?.name || item.employees?.phcs?.name || 'Sub-centre'}
                       </td>
-                      <td className="px-4 py-3 text-slate-500">
-                        {item.employees?.name || 'Staff'} ({item.employees?.employee_type || 'MPW'})
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.employees?.name || 'Staff'} <span className="text-[10px] text-slate-400">({item.employees?.employee_type || 'MPW'})</span>
                       </td>
-                      <td className="px-4 py-3 text-rose-600 font-bold">
-                        {item.status || 'Pending'}
+                      <td className="px-4 py-3">
+                        <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-700 border border-red-200/50">
+                          {item.status || 'Pending'}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -674,17 +705,17 @@ export default function Dashboard() {
               </table>
             )}
           </div>
-          <div className="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
+          <div className="p-3.5 bg-slate-50/80 border-t border-slate-200/80 flex gap-2">
             <button 
               onClick={handleExportPending}
-              className="flex-1 py-2 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-200 flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-3.5 w-3.5" />
               Export
             </button>
             <button 
               onClick={() => navigate('/reports/pending')}
-              className="flex-[2] py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700"
+              className="flex-[2] py-2 bg-slate-900 text-white text-xs font-semibold rounded-xl hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
             >
               {t('dash.viewAllPending')}
             </button>
