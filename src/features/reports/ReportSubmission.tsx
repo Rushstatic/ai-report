@@ -489,9 +489,29 @@ export default function ReportSubmission() {
   };
 
   const renderReportFieldNode = (field: FormField, depth: number = 0): React.ReactNode => {
+    const hasChildren = field.children && field.children.length > 0;
+
+    if (hasChildren) {
+      return (
+        <div key={field.id} className={`my-4 border border-slate-200 rounded-lg overflow-hidden shadow-sm ${depth > 0 ? 'ml-2 sm:ml-6 mt-4 border-l-4 border-l-blue-400' : 'bg-white'}`}>
+          <div className="bg-slate-100/70 px-4 py-3 border-b border-slate-200">
+            <h3 className="font-bold text-slate-800 text-sm">
+              {language === 'mr' ? field.label_mr : field.label_en}
+              <span className="text-slate-500 font-normal ml-2 text-xs">
+                ({language === 'mr' ? field.label_en : field.label_mr})
+              </span>
+            </h3>
+          </div>
+          <div className="p-4 sm:p-5 space-y-5 bg-white">
+            {field.children!.map(child => renderReportFieldNode(child, depth + 1))}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <React.Fragment key={field.id}>
-        <div className={`space-y-1.5 ${depth > 0 ? 'mt-4' : ''}`} style={{ marginLeft: `${depth * 1.5}rem` }}>
+        <div className={`space-y-1.5 ${depth > 0 ? 'mt-4' : ''}`}>
           <label htmlFor={field.id} className="block text-sm font-semibold text-slate-700">
             {language === 'mr' ? field.label_mr : field.label_en}
             <span className="text-slate-400 font-normal ml-2 text-xs">
@@ -583,13 +603,6 @@ export default function ReportSubmission() {
             </select>
           )}
         </div>
-        
-        {/* Render children */}
-        {field.children && field.children.length > 0 && (
-          <div className="border-l-2 border-slate-200 pl-4 mt-4 space-y-4">
-            {field.children.map(child => renderReportFieldNode(child, depth + 1))}
-          </div>
-        )}
       </React.Fragment>
     );
   };
