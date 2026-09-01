@@ -16,7 +16,8 @@ import {
   Edit3,
   Save,
   Check,
-  Share2
+  Share2,
+  FileText
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useLanguageStore } from '@/store/languageStore';
@@ -25,6 +26,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import PrintPreviewModal from '@/components/PrintPreviewModal';
+import { fetchAllActiveForms, getFormWithFields, StoredForm, FormFieldItem, buildFieldTree } from '@/utils/formStorage';
 
 interface MetricColumn {
   id: string;
@@ -51,6 +53,10 @@ export default function FacilityMatrixReport() {
   const { language } = useLanguageStore();
   const { employee } = useAuth();
   
+  // Available Forms from DB & Form Builder
+  const [availableForms, setAvailableForms] = useState<StoredForm[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState<string>('scrub_typhus');
+  
   // Filters
   const [selectedPhcName, setSelectedPhcName] = useState<string>('प्राथमिक आरोग्य केंद्र भादा');
   const [selectedFormTitle, setSelectedFormTitle] = useState<string>('स्क्रब टायफस दैनिक अहवाल');
@@ -74,6 +80,31 @@ export default function FacilityMatrixReport() {
   ];
 
   const [facilities, setFacilities] = useState<FacilityRow[]>(defaultFacilities);
+
+  // Load all user-created & active forms
+  useEffect(() => {
+    async function loadForms() {
+      try {
+        const forms = await fetchAllActiveForms();
+        setAvailableForms(forms);
+        
+        // If there is any active form created by user, default to it if user hasn't chosen
+        if (forms && forms.length > 0) {
+          const customForm = forms.find(f => !f.id.startsWith('std_') && f.id !== 'scrub_typhus');
+          if (customForm) {
+            setSelectedFormId(customForm.id);
+            setSelectedFormTitle(customForm.name);
+          } else {
+            setSelectedFormId(forms[0].id);
+            setSelectedFormTitle(forms[0].name);
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading forms in FacilityMatrixReport:', err);
+      }
+    }
+    loadForms();
+  }, []);
 
   // Metric Columns Definition matching the sample image exactly
   const metricColumns: MetricColumn[] = [
@@ -654,16 +685,48 @@ export default function FacilityMatrixReport() {
         {/* Form Title Selector */}
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">
-            {language === 'mr' ? 'अहवाल प्रकार (Form/Disease):' : 'Report / Program Form:'}
+            {language === 'mr' ? 'अहवाल प्रकार / फॉर्म निवडा:' : 'Select Report / Form:'}
           </label>
           <select
-            value={selectedFormTitle}
-            onChange={(e) => setSelectedFormTitle(e.target.value)}
+            value={selectedFormId}
+            onChange={(e) => {
+              const fId = e.target.value;
+              setSelectedFormId(fId);
+              const found = availableForms.find(f => f.id === fId);
+              if (found) {
+                setSelectedFormTitle(found.name);
+              } else if (fId === 'scrub_typhus') {
+                setSelectedFormTitle('स्क्रब टायफस दैनिक अहवाल');
+              } else if (fId === 'epidemic') {
+                setSelectedFormTitle('साथरोग दैनिक अहवाल');
+              } else if (fId === 'vector_borne') {
+                setSelectedFormTitle('कीटकजन्य आजार नियंत्रण अहवाल');
+              }
+            }}
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="स्क्रब टायफस दैनिक अहवाल">स्क्रब टायफस दैनिक अहवाल (Scrub Typhus Daily)</option>
-            <option value="साथरोग दैनिक अहवाल">साथरोग दैनिक अहवाल (Epidemic Daily Surveillance)</option>
-            <option value="कीटकजन्य आजार नियंत्रण अहवाल">कीटकजन्य आजार नियंत्रण अहवाल (Vector Borne Diseases)</option>
+            {/* User-created Custom Forms */}
+            {availableForms.filter(f => !f.id.startsWith('std_')).length > 0 && (
+              <optgroup label={language === 'mr' ? '🌟 तुम्ही तयार केलेले सक्रिय अहवाल' : '🌟 Your Custom Active Forms'}>
+                {availableForms.filter(f => !f.id.startsWith('std_')).map(f => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.reporting_period || 'Daily/Monthly'})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {/* Standard / System Forms */}
+            <optgroup label={language === 'mr' ? '📋 इतर शासकीय नमुना अहवाल' : '📋 Standard System Reports'}>
+              <option value="scrub_typhus">स्क्रब टायफस दैनिक अहवाल (Scrub Typhus Daily)</option>
+              <option value="epidemic">साथरोग दैनिक अहवाल (Epidemic Daily Surveillance)</option>
+              <option value="vector_borne">कीटकजन्य आजार नियंत्रण अहवाल (Vector Borne Diseases)</option>
+              {availableForms.filter(f => f.id.startsWith('std_')).map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
 
