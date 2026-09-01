@@ -15,12 +15,16 @@ import {
   Loader2,
   FileSpreadsheet,
   Printer,
-  ChevronDown
+  ChevronDown,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { exportStructuredReportToPDF, exportToPDF } from '@/utils/pdfExport';
 import { exportStructuredReportToExcel } from '@/utils/excelExport';
 import { prepareReportData } from '@/utils/reportDataHelper';
 import ReportDownloadModal from '@/components/ReportDownloadModal';
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
+import { deleteReportSubmission } from '@/utils/formStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import { useTranslation } from '@/locales/translations';
 import { supabase } from '@/lib/supabase';
@@ -39,6 +43,11 @@ export default function MyReports() {
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedReportForDownload, setSelectedReportForDownload] = useState<any | null>(null);
+
+  // Deletion Modal State
+  const [reportToDelete, setReportToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const isController = employee?.employee_type?.includes('CONTROLLER');
   const subcentreName = (employee as any)?.sub_centres?.name || 'Sub-centre';
@@ -144,8 +153,76 @@ export default function MyReports() {
     }
   };
 
+  const handleDeleteReport = async () => {
+    if (!reportToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteReportSubmission(reportToDelete.id);
+      if (res.success) {
+        setReports(prev => prev.filter(r => r.id !== reportToDelete.id));
+        setDeleteNotice({
+          type: 'success',
+          message: language === 'mr'
+            ? `अहवाल "${reportToDelete.forms?.name || 'Report'}" Supabase मधून यशस्वीरीत्या हटवला गेला आहे.`
+            : `Report "${reportToDelete.forms?.name || 'Report'}" deleted successfully from Supabase.`
+        });
+        setReportToDelete(null);
+        setTimeout(() => {
+          setDeleteNotice(null);
+        }, 5000);
+      } else {
+        setDeleteNotice({
+          type: 'error',
+          message: res.error || (language === 'mr' ? 'अहवाल हटवण्यात त्रुटी आली.' : 'Failed to delete report from Supabase.')
+        });
+      }
+    } catch (err: any) {
+      setDeleteNotice({
+        type: 'error',
+        message: err.message || 'Error occurred while deleting report from Supabase.'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Floating / Notification Banner for Deletion Feedback */}
+      {deleteNotice && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300 ${
+          deleteNotice.type === 'success' 
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+            : 'bg-red-50 border-red-300 text-red-900'
+        }`}>
+          <div className="flex items-center gap-3">
+            {deleteNotice.type === 'success' ? (
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-bold">{deleteNotice.message}</p>
+              {deleteNotice.type === 'success' && (
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  {language === 'mr' ? 'Supabase डेटाबेसमधील सर्व संबंधित नोंदी हटवण्यात आल्या आहेत.' : 'All field records have been cleared from Supabase cloud database.'}
+                </p>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={() => setDeleteNotice(null)}
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-black/5"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header with Title and Submit Report button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -337,11 +414,22 @@ export default function MyReports() {
                             {isEditable && (
                               <button 
                                 onClick={() => navigate(`/reports/submit/${report.form_id}/${report.id}`)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-colors ml-1"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-colors ml-1 cursor-pointer"
                                 title={language === 'mr' ? 'अहवाल दुरुस्त करा' : 'Edit Report'}
                               >
                                 <Edit className="w-3.5 h-3.5" />
                                 {language === 'mr' ? 'दुरुस्त करा' : 'Edit'}
+                              </button>
+                            )}
+
+                            {(isOwnSubmission || isController) && (
+                              <button 
+                                onClick={() => setReportToDelete(report)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold transition-colors ml-1 cursor-pointer"
+                                title={language === 'mr' ? 'अहवाल हटवा (Delete Report)' : 'Delete Report'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                {language === 'mr' ? 'हटवा' : 'Delete'}
                               </button>
                             )}
                           </div>
@@ -355,6 +443,28 @@ export default function MyReports() {
           </table>
         </div>
       </div>
+
+      {/* Confirmation Modal for Report Deletion */}
+      <ConfirmDeleteDialog
+        isOpen={!!reportToDelete}
+        onClose={() => !isDeleting && setReportToDelete(null)}
+        onConfirm={handleDeleteReport}
+        isDeleting={isDeleting}
+        title={language === 'mr' ? 'सादर केलेला अहवाल हटवा' : 'Delete Submitted Report'}
+        description={
+          language === 'mr'
+            ? 'तुम्हाला हा अहवाल Supabase मधून कायमचा हटवायचा आहे का? या अहवालातील सर्व आकडेवारी आणि नोंदी सुरक्षितपणे नष्ट केल्या जातील.'
+            : 'Are you sure you want to permanently delete this submitted report from Supabase? All associated values and records will be removed.'
+        }
+        itemDetails={reportToDelete ? {
+          formName: reportToDelete.forms?.name,
+          employeeName: reportToDelete.employees?.name,
+          role: reportToDelete.employees?.employee_type,
+          location: reportToDelete.villages?.name || reportToDelete.employees?.sub_centres?.name || reportToDelete.employees?.phcs?.name || 'Sub-centre',
+          period: `${new Date(reportToDelete.period_start).toLocaleDateString()} to ${new Date(reportToDelete.period_end).toLocaleDateString()}`,
+          status: reportToDelete.status
+        } : undefined}
+      />
 
       {/* Role-Based Form Submission Selector Modal */}
       {showSubmitModal && (

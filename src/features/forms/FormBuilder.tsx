@@ -99,23 +99,30 @@ export default function FormBuilder() {
 
   const handleConfirmDelete = async () => {
     if (!formToDelete) return;
+    const targetToDelete = formToDelete;
     setIsDeleting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await deleteFormCompletely(formToDelete.id);
+      const res = await deleteFormCompletely(targetToDelete.id);
+      setFormToDelete(null); // Close confirmation modal immediately to prevent repeated dialogs
       if (res.success) {
-        setSuccessMsg(language === 'mr' ? `प्रपत्र "${formToDelete.name}" पूर्णपणे हटवले गेले आहे.` : `Form "${formToDelete.name}" has been permanently deleted.`);
-        setFormToDelete(null);
-        if (loadedFormId === formToDelete.id) {
+        setSuccessMsg(
+          language === 'mr'
+            ? `प्रपत्र "${targetToDelete.name}" डेटाबेसमधून यशस्वीरीत्या हटवले गेले आहे.`
+            : `Form "${targetToDelete.name}" has been deleted successfully.`
+        );
+        if (loadedFormId === targetToDelete.id) {
           handleCreateForm();
           setViewMode('list');
         }
         await loadAllForms();
       } else {
         setErrorMsg(res.error || (language === 'mr' ? 'प्रपत्र हटवण्यात त्रुटी आली.' : 'Failed to delete form.'));
+        await loadAllForms();
       }
     } catch (err: any) {
+      setFormToDelete(null);
       setErrorMsg(err.message || 'Error deleting form');
     } finally {
       setIsDeleting(false);
@@ -588,16 +595,22 @@ export default function FormBuilder() {
         }
 
         if (sectionId) {
-          // Clean previous fields if any and insert fresh
+          // Identify fields that were deleted vs kept
           const { data: oldFlds } = await (supabase
             .from('form_fields') as any)
             .select('id')
             .eq('section_id', sectionId);
 
-          if (oldFlds && oldFlds.length > 0) {
-            const oldIds = oldFlds.map((o: any) => o.id);
-            await (supabase.from('form_field_options') as any).delete().in('field_id', oldIds);
-            await (supabase.from('form_fields') as any).delete().in('id', oldIds);
+          const newFieldIds = fields.map(f => f.id);
+          const oldIds = (oldFlds || []).map((o: any) => o.id);
+          const removedFieldIds = oldIds.filter(id => !newFieldIds.includes(id));
+
+          // Clean up only truly removed fields in safe foreign-key order
+          if (removedFieldIds.length > 0) {
+            await (supabase.from('report_submission_values') as any).delete().in('field_id', removedFieldIds);
+            await (supabase.from('form_field_options') as any).delete().in('field_id', removedFieldIds);
+            await (supabase.from('form_fields') as any).update({ parent_field_id: null }).in('parent_field_id', removedFieldIds);
+            await (supabase.from('form_fields') as any).delete().in('id', removedFieldIds);
           }
 
           const fieldsToInsert = fields.map((f, index) => {
@@ -631,9 +644,10 @@ export default function FormBuilder() {
             };
           });
 
+          // Upsert fields directly to preserve existing foreign-key relations
           let { data: insertedFields, error: fieldInsertErr } = await (supabase
             .from('form_fields') as any)
-            .insert(fieldsToInsert)
+            .upsert(fieldsToInsert, { onConflict: 'id' })
             .select();
             
           if (fieldInsertErr && (fieldInsertErr.code === '42703' || (fieldInsertErr.message && fieldInsertErr.message.includes('schema cache')))) {
@@ -642,14 +656,17 @@ export default function FormBuilder() {
                const { parent_field_id, allow_sub_fields, master_data_source, master_data_field, master_data_mode, ...rest } = f;
                return rest;
              });
-             const retryRes = await (supabase.from('form_fields') as any).insert(minimalFields).select();
+             const retryRes = await (supabase.from('form_fields') as any).upsert(minimalFields, { onConflict: 'id' }).select();
              insertedFields = retryRes.data;
              fieldInsertErr = retryRes.error;
           }
           if (fieldInsertErr) throw fieldInsertErr;
 
+          // Dropdown options: remove previous options for these active fields and re-insert updated ones
+          if (newFieldIds.length > 0) {
+            await (supabase.from('form_field_options') as any).delete().in('field_id', newFieldIds);
+          }
 
-          // Dropdown options
           const optionsToInsert: any[] = [];
           fields.forEach((f, i) => {
             if (f.type === 'Dropdown' && f.options && f.options.length > 0 && insertedFields?.[i]) {
@@ -1580,7 +1597,9 @@ export default function FormBuilder() {
                   {language === 'mr' ? 'त्रुटी (Error)' : 'Action Required'}
                 </span>
                 <p className="text-sm font-bold text-red-900">
-                  {language === 'mr' ? 'प्रपत्र जतन करताना समस्या उद्भवली' : 'Unable to publish form'}
+                  {isDeleting
+                    ? (language === 'mr' ? 'प्रपत्र हटवताना समस्या उद्भवली' : 'Unable to delete form')
+                    : (language === 'mr' ? 'प्रपत्र जतन करताना समस्या उद्भवली' : 'Unable to publish form')}
                 </p>
               </div>
               <p className="text-xs font-medium text-red-700 mt-1.5 leading-relaxed bg-red-100/50 p-2 rounded-md border border-red-200/60">
