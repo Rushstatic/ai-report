@@ -34,6 +34,7 @@ const getNavigation = (employeeType?: string) => {
     { nameKey: 'nav.dashboard', href: '/', icon: LayoutDashboard },
     { nameKey: 'nav.dataEntry', href: '/reports/entry', icon: PenSquare },
     { nameKey: 'nav.myReports', href: '/reports/my', icon: FileText },
+    { nameKey: 'nav.matrixReport', href: '/reports/matrix', icon: Building },
   ];
 
   if (isController) {

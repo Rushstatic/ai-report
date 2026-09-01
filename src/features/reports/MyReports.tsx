@@ -163,11 +163,19 @@ export default function MyReports() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
+            onClick={() => navigate('/reports/matrix')}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Building2 className="w-4 h-4" />
+            {language === 'mr' ? 'संस्थानिहाय अहवाल मॅट्रिक्स' : 'Facility Matrix Report'}
+          </button>
+
           {!isController && (
             <button 
               onClick={() => setShowSubmitModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               {language === 'mr' ? 'नवीन अहवाल भरा' : 'Submit New Report'}

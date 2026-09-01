@@ -23,7 +23,60 @@ export interface StandardFormDefinition {
   }[];
 }
 
-export const STANDARD_FORMS: StandardFormDefinition[] = [];
+export const STANDARD_FORMS: StandardFormDefinition[] = [
+  {
+    id: 'form-scrub-typhus-daily',
+    name: 'स्क्रब टायफस दैनिक अहवाल (Scrub Typhus Daily Report)',
+    code: 'SCRUB_TYPHUS_DAILY',
+    description: 'उपकेंद्र व प्राथमिक आरोग्य केंद्रनिहाय स्क्रब टायफस संशयित रुग्ण, चाचण्या, पॉझिटिव्ह रुग्ण व मृत्यू यांचा दैनिक व प्रगतीपथावरील अहवाल',
+    reporting_period: 'Daily',
+    report_type: 'SUBCENTRE_LEVEL',
+    target_role: 'ALL',
+    employee_wise_submission: false,
+    sections: [
+      {
+        title: 'स्क्रब टायफस संशयित रुग्ण (Scrub Typhus Cases)',
+        fields: [
+          { name: 'cases_daily', label_en: 'Scrub Typhus Cases - Daily', label_mr: 'स्क्रब टायफस रुग्ण - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'cases_pro', label_en: 'Scrub Typhus Cases - Progressive', label_mr: 'स्क्रब टायफस रुग्ण - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+        ]
+      },
+      {
+        title: 'तपासलेले नमुने / चाचण्या (Tests Conducted)',
+        fields: [
+          { name: 'rdk_tests_daily', label_en: 'RDK Tests - Daily', label_mr: 'RDK चाचण्या - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'rdk_tests_pro', label_en: 'RDK Tests - Progressive', label_mr: 'RDK चाचण्या - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'wf_tests_daily', label_en: 'Weil-Felix Tests - Daily', label_mr: 'Weil-Felix चाचण्या - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'wf_tests_pro', label_en: 'Weil-Felix Tests - Progressive', label_mr: 'Weil-Felix चाचण्या - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'elisa_tests_daily', label_en: 'ELISA IgM Tests - Daily', label_mr: 'ELISA IgM चाचण्या - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'elisa_tests_pro', label_en: 'ELISA IgM Tests - Progressive', label_mr: 'ELISA IgM चाचण्या - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'total_tests_daily', label_en: 'Total Tests - Daily', label_mr: 'एकूण चाचण्या - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'total_tests_pro', label_en: 'Total Tests - Progressive', label_mr: 'एकूण चाचण्या - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+        ]
+      },
+      {
+        title: 'पॉझिटिव्ह रुग्ण (Positive Cases)',
+        fields: [
+          { name: 'rdk_pos_daily', label_en: 'RDK Positive - Daily', label_mr: 'RDK पॉझिटिव्ह - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'rdk_pos_pro', label_en: 'RDK Positive - Progressive', label_mr: 'RDK पॉझिटिव्ह - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'wf_pos_daily', label_en: 'Weil-Felix Positive - Daily', label_mr: 'Weil-Felix पॉझिटिव्ह - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'wf_pos_pro', label_en: 'Weil-Felix Positive - Progressive', label_mr: 'Weil-Felix पॉझिटिव्ह - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'elisa_pos_daily', label_en: 'ELISA IgM Positive - Daily', label_mr: 'ELISA IgM पॉझिटिव्ह - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'elisa_pos_pro', label_en: 'ELISA IgM Positive - Progressive', label_mr: 'ELISA IgM पॉझिटिव्ह - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'total_pos_daily', label_en: 'Total Positive - Daily', label_mr: 'एकूण पॉझिटिव्ह - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'total_pos_pro', label_en: 'Total Positive - Progressive', label_mr: 'एकूण पॉझिटिव्ह - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+        ]
+      },
+      {
+        title: 'मृत्यू (Deaths)',
+        fields: [
+          { name: 'deaths_daily', label_en: 'Deaths - Daily', label_mr: 'मृत्यू - दैनिक', field_type: 'Number', is_required: false, placeholder: '0' },
+          { name: 'deaths_pro', label_en: 'Deaths - Progressive', label_mr: 'मृत्यू - प्रगती', field_type: 'Number', is_required: false, placeholder: '0' },
+        ]
+      }
+    ]
+  }
+];
 
 /**
  * Synchronizes standard forms with Supabase database if they don't exist yet.

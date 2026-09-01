@@ -539,8 +539,16 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 mt-1">Live synchronized health statistics and compliance monitoring.</p>
         </div>
         
-        {talukaOptions.length > 0 && employee?.employee_type === 'DISTRICT_CONTROLLER' && (
-          <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button 
+            onClick={() => navigate('/reports/matrix')}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+          >
+            <Building2 className="w-4 h-4" />
+            {language === 'mr' ? 'संस्थानिहाय अहवाल मॅट्रिक्स' : 'Facility Matrix Report'}
+          </button>
+
+          {talukaOptions.length > 0 && employee?.employee_type === 'DISTRICT_CONTROLLER' && (
             <select 
               value={selectedTalukaId}
               onChange={(e) => setSelectedTalukaId(e.target.value)}
@@ -553,8 +561,8 @@ export default function Dashboard() {
                 </option>
               ))}
             </select>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}

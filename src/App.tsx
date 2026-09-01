@@ -14,6 +14,7 @@ import FormBuilder from './features/forms/FormBuilder';
 import ReportSubmission from './features/reports/ReportSubmission';
 import MyReports from './features/reports/MyReports';
 import DataEntryList from './features/reports/DataEntryList';
+import FacilityMatrixReport from './features/reports/FacilityMatrixReport';
 import PendingReports from './features/reports/PendingReports';
 import EmployeeManager from './features/employees/EmployeeManager';
 import HierarchyManager from './features/hierarchy/HierarchyManager';
@@ -62,6 +63,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="reports/entry" element={<DataEntryList />} />
           <Route path="reports/my" element={<MyReports />} />
+          <Route path="reports/matrix" element={<FacilityMatrixReport />} />
           <Route path="reports/submit/:formId/:submissionId?" element={<ReportSubmission />} />
           
           <Route path="reports/pending" element={
