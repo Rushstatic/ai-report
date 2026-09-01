@@ -331,8 +331,15 @@ export function isSubmissionDeleted(submissionId: string): boolean {
 export function getDefaultPeriodDates(reportingPeriod?: string): { periodStart: string; periodEnd: string } {
   const now = new Date();
   
+  const toLocalYMD = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  
   if (reportingPeriod === 'Daily') {
-    const today = now.toISOString().split('T')[0];
+    const today = toLocalYMD(now);
     return { periodStart: today, periodEnd: today };
   } 
   
@@ -343,8 +350,8 @@ export function getDefaultPeriodDates(reportingPeriod?: string): { periodStart: 
     const lastDay = new Date(firstDay);
     lastDay.setDate(firstDay.getDate() + 6);
     return { 
-      periodStart: firstDay.toISOString().split('T')[0], 
-      periodEnd: lastDay.toISOString().split('T')[0] 
+      periodStart: toLocalYMD(firstDay), 
+      periodEnd: toLocalYMD(lastDay) 
     };
   }
   
@@ -353,20 +360,20 @@ export function getDefaultPeriodDates(reportingPeriod?: string): { periodStart: 
     const month = now.getMonth();
     const date = now.getDate();
     if (date <= 15) {
-      const start = new Date(year, month, 1).toISOString().split('T')[0];
-      const end = new Date(year, month, 15).toISOString().split('T')[0];
-      return { periodStart: start, periodEnd: end };
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month, 15);
+      return { periodStart: toLocalYMD(start), periodEnd: toLocalYMD(end) };
     } else {
-      const start = new Date(year, month, 16).toISOString().split('T')[0];
-      const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
-      return { periodStart: start, periodEnd: end };
+      const start = new Date(year, month, 16);
+      const end = new Date(year, month + 1, 0);
+      return { periodStart: toLocalYMD(start), periodEnd: toLocalYMD(end) };
     }
   }
 
   // Default to Monthly
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-  return { periodStart: firstDay, periodEnd: lastDay };
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { periodStart: toLocalYMD(firstDay), periodEnd: toLocalYMD(lastDay) };
 }
 
 export function filterOutDeletedSubmissions<T extends { id: string; status?: string }>(submissions: T[]): T[] {

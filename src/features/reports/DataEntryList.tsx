@@ -115,7 +115,12 @@ export default function DataEntryList() {
 
     if (form.employee_wise_submission) {
       // Employee-wise: Check submissions by this specific employee for the current period
-      const mySubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.employee_id === employee?.id && s.period_start === periodStart);
+      const mySubs = submissions.filter(s => 
+        (s.form_id === form.id || s.form_id === form.code) && 
+        s.employee_id === employee?.id && 
+        s.period_start === periodStart && 
+        (s.status === 'Submitted' || s.status === 'Approved')
+      );
       const submittedVillageIds = new Set(mySubs.map(s => s.village_id).filter(Boolean));
       const totalVillages = villages.length;
       const submittedCount = submittedVillageIds.size;
@@ -133,7 +138,11 @@ export default function DataEntryList() {
       };
     } else {
       // Sub-centre level or regular village-wise: Check submissions by any staff member in sub-centre for the current period
-      const subCentreSubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.period_start === periodStart);
+      const subCentreSubs = submissions.filter(s => 
+        (s.form_id === form.id || s.form_id === form.code) && 
+        s.period_start === periodStart && 
+        (s.status === 'Submitted' || s.status === 'Approved')
+      );
       const submittedVillageIds = new Set(subCentreSubs.map(s => s.village_id).filter(Boolean));
       const totalVillages = villages.length;
       const submittedCount = submittedVillageIds.size;
