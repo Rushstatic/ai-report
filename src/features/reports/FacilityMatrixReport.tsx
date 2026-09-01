@@ -197,7 +197,10 @@ export default function FacilityMatrixReport() {
   const [selectedFormTitle, setSelectedFormTitle] = useState<string>('दैनिक अहवाल');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const d = new Date();
-    return d.toISOString().split('T')[0];
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   });
   const [phcList, setPhcList] = useState<any[]>([]);
   const [subcentreList, setSubcentreList] = useState<any[]>([]);
