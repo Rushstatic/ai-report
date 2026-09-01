@@ -73,6 +73,7 @@ export default function ReportSubmission() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [periodStart, setPeriodStart] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
+  const [existingSubmissions, setExistingSubmissions] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +129,7 @@ export default function ReportSubmission() {
         }
 
         if (!formObj) {
-          setError('The requested form was not found.');
+          setError('The requested form was not found or has been removed.');
           setLoading(false);
           return;
         }
@@ -176,6 +177,17 @@ export default function ReportSubmission() {
           } else {
             setVillages([]);
             setSelectedVillageId('');
+          }
+
+          // Fetch existing submissions for this sub-centre and form
+          const { data: subRecs } = await (supabase
+            .from('report_submissions') as any)
+            .select('id, village_id, period_start, period_end, status, submitted_at, employee_id')
+            .or(`form_id.eq.${activeFormId},form_id.eq.${formObj?.code || activeFormId}`)
+            .eq('sub_centre_id', employee.sub_centre_id);
+
+          if (subRecs) {
+            setExistingSubmissions(subRecs);
           }
         } else {
           // Controller or General user
@@ -233,6 +245,62 @@ export default function ReportSubmission() {
   }, [formId, submissionId, employee]);
 
   
+  // Check submissions for the selected period
+  const periodMatchingSubs = existingSubmissions.filter(sub => {
+    if (isEditMode && sub.id === submissionId) return false;
+    const isSamePeriod = !periodStart || sub.period_start === periodStart;
+    const isActiveStatus = sub.status === 'Submitted' || sub.status === 'Approved';
+    return isSamePeriod && isActiveStatus;
+  });
+
+  // Determine submitted village IDs according to submission condition
+  const submittedVillageIds = new Set<string>();
+  const submittedVillageDetails: Array<{ id: string; name: string; submittedAt?: string; status: string }> = [];
+
+  periodMatchingSubs.forEach(sub => {
+    if (form?.employee_wise_submission) {
+      if (sub.employee_id === employee?.id && sub.village_id) {
+        submittedVillageIds.add(sub.village_id);
+        const vObj = villages.find(v => v.id === sub.village_id);
+        if (vObj && !submittedVillageDetails.some(d => d.id === vObj.id)) {
+          submittedVillageDetails.push({ id: vObj.id, name: vObj.name, submittedAt: sub.submitted_at, status: sub.status });
+        }
+      }
+    } else {
+      if (sub.village_id) {
+        submittedVillageIds.add(sub.village_id);
+        const vObj = villages.find(v => v.id === sub.village_id);
+        if (vObj && !submittedVillageDetails.some(d => d.id === vObj.id)) {
+          submittedVillageDetails.push({ id: vObj.id, name: vObj.name, submittedAt: sub.submitted_at, status: sub.status });
+        }
+      }
+    }
+  });
+
+  // Non-list forms hide submitted villages for specific conditions/period
+  const isNonListVillageForm = form?.report_type !== 'LIST' && form?.report_type !== 'SUBCENTRE_LEVEL';
+  const availableVillages = isEditMode || !isNonListVillageForm
+    ? villages
+    : villages.filter(v => !submittedVillageIds.has(v.id));
+
+  // Sub-centre level report duplicate check
+  const isSubCentreLevelAlreadySubmitted = !isEditMode && form?.report_type === 'SUBCENTRE_LEVEL' && periodMatchingSubs.some(sub => 
+    form.employee_wise_submission ? sub.employee_id === employee?.id : true
+  );
+
+  // All villages submitted check
+  const isAllVillagesAlreadySubmitted = !isEditMode && isNonListVillageForm && villages.length > 0 && availableVillages.length === 0;
+
+  // Auto-switch selected village if current selection is not available
+  useEffect(() => {
+    if (isEditMode) return;
+    if (isNonListVillageForm && availableVillages.length > 0) {
+      if (!selectedVillageId || !availableVillages.some(v => v.id === selectedVillageId)) {
+        setSelectedVillageId(availableVillages[0].id);
+      }
+    }
+  }, [availableVillages, isNonListVillageForm, isEditMode, selectedVillageId]);
+
   // Auto-populate Master Data when village is selected or changed
   useEffect(() => {
     if (!form || !form.fields || !villages.length || !selectedVillageId) return;
@@ -819,34 +887,45 @@ export default function ReportSubmission() {
             </div>
 
             <div className="bg-white p-3 rounded-lg border border-blue-100/80 shadow-xs">
-              <div className="flex items-center gap-1.5 text-slate-400 font-bold uppercase tracking-wider mb-1">
-                {form.report_type === 'SUBCENTRE_LEVEL' ? (
-                  <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                ) : (
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+              <div className="flex items-center justify-between gap-1.5 text-slate-400 font-bold uppercase tracking-wider mb-1">
+                <div className="flex items-center gap-1.5">
+                  {form.report_type === 'SUBCENTRE_LEVEL' ? (
+                    <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                  ) : (
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                  )}
+                  <span>
+                    {form.report_type === 'SUBCENTRE_LEVEL' 
+                      ? (language === 'mr' ? 'अहवाल स्तर' : 'Report Level')
+                      : (language === 'mr' ? 'गाव निवडा (Village)' : 'Select Village')}
+                  </span>
+                </div>
+                {isNonListVillageForm && villages.length > 0 && (
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                    {availableVillages.length}/{villages.length} {language === 'mr' ? 'उपलब्ध' : 'Available'}
+                  </span>
                 )}
-                <span>
-                  {form.report_type === 'SUBCENTRE_LEVEL' 
-                    ? (language === 'mr' ? 'अहवाल स्तर' : 'Report Level')
-                    : (language === 'mr' ? 'गाव निवडा (Village)' : 'Select Village')}
-                </span>
               </div>
               {form.report_type === 'SUBCENTRE_LEVEL' ? (
                 <span className="font-semibold text-amber-800 text-xs block py-1">
                   {language === 'mr' ? '🏢 उपकेंद्र स्तर (सर्व गावांचे एकत्रित)' : '🏢 Sub-centre Level (Consolidated)'}
                 </span>
-              ) : villages.length > 0 ? (
+              ) : availableVillages.length > 0 ? (
                 <select
                   value={selectedVillageId}
                   onChange={(e) => handleVillageChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded text-xs py-1 px-2 font-medium text-slate-800 focus:ring-1 focus:ring-blue-500"
                 >
-                  {villages.map(v => (
+                  {availableVillages.map(v => (
                     <option key={v.id} value={v.id}>
                       {v.name} {v.code ? `(${v.code})` : ''}
                     </option>
                   ))}
                 </select>
+              ) : isAllVillagesAlreadySubmitted ? (
+                <span className="font-bold text-emerald-700 text-xs block py-0.5">
+                  {language === 'mr' ? '✅ सर्व गावे सादर झाली आहेत' : '✅ All villages submitted'}
+                </span>
               ) : (
                 <span className="font-medium text-amber-700 text-xs block py-0.5">
                   {language === 'mr' ? '⚠️ गावे जोडलेली नाहीत' : '⚠️ No villages mapped'}
@@ -866,6 +945,87 @@ export default function ReportSubmission() {
           </div>
         </div>
 
+        {/* All Villages Submitted Banner for Non-list Forms */}
+        {isAllVillagesAlreadySubmitted && (
+          <div className="m-6 p-5 bg-emerald-50 border-2 border-emerald-200 rounded-xl space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-950">
+                  {language === 'mr' 
+                    ? `या कालावधीसाठी (${periodStart} ते ${periodEnd}) या उपकेंद्रातील सर्व गावांचे अहवाल आधीच सादर झाले आहेत.` 
+                    : `All villages for reporting period (${periodStart} to ${periodEnd}) have already been submitted.`}
+                </h3>
+                <p className="text-xs text-emerald-800 mt-1">
+                  {language === 'mr'
+                    ? 'गावनिहाय प्रपत्र नियमानुसार, आधी सादर केलेली गावे पुन्हा यादीत दाखवली जात नाहीत. दुरुस्ती करण्यासाठी किंवा पाहण्यासाठी आपण "माझे अहवाल" मध्ये जाऊन अहवाल संपादित करू शकता.'
+                    : 'As per system rules, submitted villages are excluded from the selection list. To view or make corrections, please visit "My Reports".'}
+                </p>
+                {submittedVillageDetails.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {submittedVillageDetails.map(sv => (
+                      <span key={sv.id} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-emerald-300 text-emerald-800 px-2.5 py-1 rounded-md shadow-2xs">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        {sv.name} {sv.submittedAt ? `(${new Date(sv.submittedAt).toLocaleDateString()})` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/reports/my')}
+                className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs"
+              >
+                {language === 'mr' ? 'माझे सादर केलेले अहवाल पहा' : 'View Submitted Reports'}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/reports')}
+                className="px-4 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold transition-colors"
+              >
+                {language === 'mr' ? 'इतर अहवाल भरा' : 'Back to Forms List'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Subcentre Level Form Already Submitted Banner */}
+        {isSubCentreLevelAlreadySubmitted && (
+          <div className="m-6 p-5 bg-amber-50 border-2 border-amber-200 rounded-xl space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-amber-950">
+                  {language === 'mr' 
+                    ? `या उपकेंद्रासाठी या कालावधीचा (${periodStart} ते ${periodEnd}) उपकेंद्र स्तर अहवाल आधीच सादर केला आहे.` 
+                    : `Sub-centre level report for period (${periodStart} to ${periodEnd}) is already submitted.`}
+                </h3>
+                <p className="text-xs text-amber-800 mt-1">
+                  {language === 'mr'
+                    ? 'उपकेंद्र स्तरावरील प्रपत्र एका कालावधीसाठी एकदाच भरले जाते. दुरुस्तीसाठी "माझे अहवाल" मधून संपादित करा.'
+                    : 'Facility reports are submitted once per reporting cycle. To edit, please use "My Reports".'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/reports/my')}
+                className="px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs"
+              >
+                {language === 'mr' ? 'सादर अहवाल पहा' : 'View Submitted Report'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Fields from Live Database */}
         <div className="p-6 space-y-6">
           {form.fields.length === 0 ? (
@@ -882,7 +1042,7 @@ export default function ReportSubmission() {
           <button
             type="button"
             onClick={() => saveReport('Draft')}
-            disabled={submitting}
+            disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
             className="inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
           >
             <Save className="mr-2 h-4 w-4 text-slate-500" />
@@ -892,7 +1052,7 @@ export default function ReportSubmission() {
           <button
             type="button"
             onClick={() => saveReport('Submitted')}
-            disabled={submitting}
+            disabled={submitting || isAllVillagesAlreadySubmitted || isSubCentreLevelAlreadySubmitted}
             className="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 shadow-xs transition-colors"
           >
             {isEditMode ? <Save className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}

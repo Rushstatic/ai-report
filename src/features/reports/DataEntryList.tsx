@@ -39,6 +39,7 @@ export default function DataEntryList() {
 
   const [forms, setForms] = useState<FormItem[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [villages, setVillages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [periodFilter, setPeriodFilter] = useState<string>('ALL');
@@ -55,11 +56,21 @@ export default function DataEntryList() {
       const loadedForms = await fetchAllActiveForms(empRole);
       setForms(loadedForms);
 
-      // 2. Fetch recent submissions for this sub-centre to indicate status
+      // 2. Fetch villages mapped to this sub-centre
       if (employee?.sub_centre_id) {
+        const { data: vData } = await (supabase
+          .from('villages') as any)
+          .select('id, name, code')
+          .eq('sub_centre_id', employee.sub_centre_id)
+          .order('name');
+        if (vData) {
+          setVillages(vData);
+        }
+
+        // 3. Fetch recent submissions for this sub-centre to indicate status
         const { data: subData } = await (supabase
           .from('report_submissions') as any)
-          .select('id, form_id, period_start, period_end, status, submitted_at, employee_id')
+          .select('id, form_id, village_id, period_start, period_end, status, submitted_at, employee_id')
           .eq('sub_centre_id', employee.sub_centre_id)
           .order('submitted_at', { ascending: false });
 
@@ -98,21 +109,44 @@ export default function DataEntryList() {
   });
 
   const getFormStatus = (form: FormItem) => {
+    const isListType = form.report_type === 'LIST';
+    const isSubCentreLevel = form.report_type === 'SUBCENTRE_LEVEL';
+
     if (form.employee_wise_submission) {
-      // 1. Employee-wise = Yes: Needs submission by THIS specific employee
-      const mySub = submissions.find(s => s.form_id === form.id && s.employee_id === employee?.id);
+      // Employee-wise: Check submissions by this specific employee
+      const mySubs = submissions.filter(s => (s.form_id === form.id || s.form_id === form.code) && s.employee_id === employee?.id);
+      const submittedVillageIds = new Set(mySubs.map(s => s.village_id).filter(Boolean));
+      const totalVillages = villages.length;
+      const submittedCount = submittedVillageIds.size;
+      const isAllVillagesDone = totalVillages > 0 && submittedCount >= totalVillages;
+
       return {
         isEmployeeWise: true,
-        submitted: !!mySub,
-        record: mySub
+        isListType,
+        isSubCentreLevel,
+        submittedCount,
+        totalVillages,
+        isAllVillagesDone,
+        submitted: mySubs.length > 0,
+        record: mySubs[0]
       };
     } else {
-      // 2. Employee-wise = No: Completed if ANY authorized employee from sub-centre submitted
-      const subCentreSub = submissions.find(s => s.form_id === form.id);
+      // Sub-centre level or regular village-wise: Check submissions by any staff member in sub-centre
+      const subCentreSubs = submissions.filter(s => s.form_id === form.id || s.form_id === form.code);
+      const submittedVillageIds = new Set(subCentreSubs.map(s => s.village_id).filter(Boolean));
+      const totalVillages = villages.length;
+      const submittedCount = submittedVillageIds.size;
+      const isAllVillagesDone = totalVillages > 0 && submittedCount >= totalVillages;
+
       return {
         isEmployeeWise: false,
-        submitted: !!subCentreSub,
-        record: subCentreSub
+        isListType,
+        isSubCentreLevel,
+        submittedCount,
+        totalVillages,
+        isAllVillagesDone,
+        submitted: subCentreSubs.length > 0,
+        record: subCentreSubs[0]
       };
     }
   };
@@ -285,9 +319,32 @@ export default function DataEntryList() {
                   )}
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    {statusInfo.submitted && subRec ? (
+                    {!statusInfo.isListType && !statusInfo.isSubCentreLevel ? (
+                      statusInfo.isAllVillagesDone ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          {language === 'mr' 
+                            ? `सर्व ${statusInfo.totalVillages} गावे पूर्ण` 
+                            : `All ${statusInfo.totalVillages} Villages Complete`}
+                        </span>
+                      ) : statusInfo.submittedCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          {language === 'mr' 
+                            ? `${statusInfo.submittedCount}/${statusInfo.totalVillages} गावे पूर्ण (${statusInfo.totalVillages - statusInfo.submittedCount} बाकी)` 
+                            : `${statusInfo.submittedCount}/${statusInfo.totalVillages} Villages Done (${statusInfo.totalVillages - statusInfo.submittedCount} Due)`}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-700 font-semibold flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                          {language === 'mr' 
+                            ? `गावनिहाय अहवाल बाकी (०/${statusInfo.totalVillages} गावे)` 
+                            : `Village report due (0/${statusInfo.totalVillages} villages)`}
+                        </span>
+                      )
+                    ) : statusInfo.submitted && subRec ? (
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold ${
                         subRec.status === 'Approved'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -309,17 +366,21 @@ export default function DataEntryList() {
                           ? (language === 'mr' ? 'आपला वैयक्तिक अहवाल बाकी' : 'Your submission is due')
                           : form.report_type === 'SUBCENTRE_LEVEL'
                           ? (language === 'mr' ? 'उपकेंद्र अहवाल भरणे बाकी' : 'Sub-centre report due')
-                          : (language === 'mr' ? 'गावनिहाय अहवाल भरणे बाकी' : 'Village report due')}
+                          : (language === 'mr' ? 'अहवाल भरणे बाकी' : 'Report due')}
                       </span>
                     )}
                   </div>
 
                   <button
                     onClick={() => navigate(`/reports/submit/${form.id}`)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    {language === 'mr' ? 'अहवाल भरा' : 'Fill Report'}
+                    {!statusInfo.isListType && !statusInfo.isSubCentreLevel && statusInfo.submittedCount > 0 && !statusInfo.isAllVillagesDone
+                      ? (language === 'mr' ? `पुढील गाव भरा (${statusInfo.totalVillages - statusInfo.submittedCount} बाकी)` : `Fill Next Village (${statusInfo.totalVillages - statusInfo.submittedCount} Due)`)
+                      : !statusInfo.isListType && !statusInfo.isSubCentreLevel && statusInfo.isAllVillagesDone
+                      ? (language === 'mr' ? 'अहवाल पहा / नवीन' : 'View / Fill Report')
+                      : (language === 'mr' ? 'अहवाल भरा' : 'Fill Report')}
                   </button>
                 </div>
               </div>

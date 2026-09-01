@@ -73,6 +73,39 @@ export interface StoredForm {
 }
 
 const LOCAL_FORMS_KEY = 'health_portal_custom_forms_v1';
+const DELETED_FORMS_KEY = 'health_portal_deleted_forms_v1';
+
+export function getDeletedFormIds(): string[] {
+  try {
+    const raw = localStorage.getItem(DELETED_FORMS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Error reading deleted form IDs:', err);
+    return [];
+  }
+}
+
+export function markFormDeletedLocally(formId: string, formCode?: string): void {
+  try {
+    const existing = getDeletedFormIds();
+    let updated = false;
+    if (formId && !existing.includes(formId)) {
+      existing.push(formId);
+      updated = true;
+    }
+    if (formCode && !existing.includes(formCode)) {
+      existing.push(formCode);
+      updated = true;
+    }
+    if (updated) {
+      localStorage.setItem(DELETED_FORMS_KEY, JSON.stringify(existing));
+    }
+  } catch (err) {
+    console.error('Error marking form as deleted:', err);
+  }
+}
 
 export function getLocalForms(): StoredForm[] {
   try {
@@ -112,13 +145,86 @@ export function deleteLocalForm(formId: string): void {
 }
 
 /**
+ * Completely and permanently deletes a form, including all its sections, fields, options,
+ * and associated submissions across Supabase and local storage.
+ */
+export async function deleteFormCompletely(formId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Find the form in local storage or active list to retrieve code
+    const localForms = getLocalForms();
+    const targetLocal = localForms.find(f => f.id === formId || f.code === formId);
+    const formCode = targetLocal?.code;
+
+    // 2. Mark as permanently deleted in local blacklist
+    markFormDeletedLocally(formId, formCode);
+    deleteLocalForm(formId);
+
+    // 3. Delete from Supabase if configured
+    if (isSupabaseConfigured()) {
+      // Find all sections belonging to this form
+      const { data: sections } = await (supabase
+        .from('form_sections') as any)
+        .select('id')
+        .eq('form_id', formId);
+
+      const sectionIds = (sections || []).map((s: any) => s.id);
+
+      if (sectionIds.length > 0) {
+        // Find all fields belonging to these sections
+        const { data: fields } = await (supabase
+          .from('form_fields') as any)
+          .select('id')
+          .in('section_id', sectionIds);
+
+        const fieldIds = (fields || []).map((f: any) => f.id);
+
+        if (fieldIds.length > 0) {
+          // Delete options
+          await (supabase.from('form_field_options') as any).delete().in('field_id', fieldIds);
+          // Delete fields
+          await (supabase.from('form_fields') as any).delete().in('id', fieldIds);
+        }
+
+        // Delete sections
+        await (supabase.from('form_sections') as any).delete().in('id', sectionIds);
+      }
+
+      // Delete report submissions and values tied to this form
+      const { data: subs } = await (supabase
+        .from('report_submissions') as any)
+        .select('id')
+        .or(`form_id.eq.${formId},form_id.eq.${formCode || formId}`);
+
+      const subIds = (subs || []).map((s: any) => s.id);
+      if (subIds.length > 0) {
+        await (supabase.from('report_submission_values') as any).delete().in('submission_id', subIds);
+        await (supabase.from('report_submissions') as any).delete().in('id', subIds);
+      }
+
+      // Delete the form record
+      await (supabase.from('forms') as any).delete().or(`id.eq.${formId},code.eq.${formCode || formId}`);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in deleteFormCompletely:', err);
+    return { success: false, error: err.message || 'Failed to delete form.' };
+  }
+}
+
+/**
  * Loads all active forms by combining database forms, local storage forms, and standard definitions
  */
 export async function fetchAllActiveForms(targetRole?: string, includeDrafts: boolean = false): Promise<StoredForm[]> {
   const combinedMap = new Map<string, StoredForm>();
+  const deletedIds = getDeletedFormIds();
 
-  // 1. Add standard forms as baseline
+  // 1. Add standard forms as baseline (if not deleted)
   for (const sf of STANDARD_FORMS) {
+    if (deletedIds.includes(sf.id) || (sf.code && deletedIds.includes(sf.code))) {
+      continue;
+    }
+
     const fields: FormFieldItem[] = [];
     sf.sections.forEach(sec => {
       sec.fields.forEach((f, fIdx) => {
@@ -160,6 +266,9 @@ export async function fetchAllActiveForms(targetRole?: string, includeDrafts: bo
 
       if (!error && dbForms && dbForms.length > 0) {
         for (const dbf of dbForms) {
+          if (deletedIds.includes(dbf.id) || (dbf.code && deletedIds.includes(dbf.code))) {
+            continue;
+          }
           combinedMap.set(dbf.id, {
             id: dbf.id,
             name: dbf.name,
@@ -184,6 +293,9 @@ export async function fetchAllActiveForms(targetRole?: string, includeDrafts: bo
   // 3. Merge locally created/published forms (overrides baseline if newer)
   const localForms = getLocalForms();
   for (const lf of localForms) {
+    if (deletedIds.includes(lf.id) || (lf.code && deletedIds.includes(lf.code))) {
+      continue;
+    }
     if (includeDrafts || lf.active !== false) {
       combinedMap.set(lf.id, lf);
     }
@@ -207,9 +319,14 @@ export async function fetchAllActiveForms(targetRole?: string, includeDrafts: bo
  * Fetch a single form along with all its fields and options
  */
 export async function getFormWithFields(formIdOrCode: string): Promise<StoredForm | null> {
+  const deletedIds = getDeletedFormIds();
+  if (deletedIds.includes(formIdOrCode)) {
+    return null;
+  }
+
   // Check local forms first
   const localForms = getLocalForms();
-  const localMatch = localForms.find(f => f.id === formIdOrCode || f.code === formIdOrCode);
+  const localMatch = localForms.find(f => (f.id === formIdOrCode || f.code === formIdOrCode) && !deletedIds.includes(f.id) && (!f.code || !deletedIds.includes(f.code)));
   if (localMatch && localMatch.fields && localMatch.fields.length > 0) {
     return localMatch;
   }

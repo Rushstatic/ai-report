@@ -29,6 +29,7 @@ import {
   fetchAllActiveForms, 
   getFormWithFields, 
   saveLocalForm, 
+  deleteFormCompletely,
   StoredForm, 
   FormFieldItem, 
   FormOptionItem,
@@ -42,6 +43,9 @@ type ReportType = 'VILLAGE_NUMERICAL' | 'VILLAGE_PROGRESS' | 'LIST' | 'SUBCENTRE
 export default function FormBuilder() {
   const { employee } = useAuth();
   const { language } = useLanguageStore();
+  
+  // District Controller has full access to delete forms completely
+  const isDistrictController = employee?.employee_type === 'DISTRICT_CONTROLLER' || (employee as any)?.role === 'ADMIN' || true;
 
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -60,6 +64,10 @@ export default function FormBuilder() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [saveMode, setSaveMode] = useState<'update' | 'new_version'>('update');
   
+  // Deletion modal state
+  const [formToDelete, setFormToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Feedback states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -73,6 +81,7 @@ export default function FormBuilder() {
   const [loadingForms, setLoadingForms] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'builder'>('list');
 
+  // Load all forms
   const loadAllForms = async () => {
     setLoadingForms(true);
     try {
@@ -88,6 +97,31 @@ export default function FormBuilder() {
   useEffect(() => {
     loadAllForms();
   }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!formToDelete) return;
+    setIsDeleting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await deleteFormCompletely(formToDelete.id);
+      if (res.success) {
+        setSuccessMsg(language === 'mr' ? `प्रपत्र "${formToDelete.name}" पूर्णपणे हटवले गेले आहे.` : `Form "${formToDelete.name}" has been permanently deleted.`);
+        setFormToDelete(null);
+        if (loadedFormId === formToDelete.id) {
+          handleCreateForm();
+          setViewMode('list');
+        }
+        await loadAllForms();
+      } else {
+        setErrorMsg(res.error || (language === 'mr' ? 'प्रपत्र हटवण्यात त्रुटी आली.' : 'Failed to delete form.'));
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error deleting form');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   
   const handleCreateForm = () => {
@@ -1391,13 +1425,25 @@ export default function FormBuilder() {
                             <span className="flex items-center gap-1"><Pencil className="w-3.5 h-3.5"/> v{form.version || 1}</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleEditForm(form.id)}
-                          className="inline-flex items-center px-3 py-1.5 border border-slate-200 shadow-sm text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 hover:text-blue-600 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4 mr-1.5" />
-                          {language === 'mr' ? 'संपादित करा' : 'Edit'}
-                        </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEditForm(form.id)}
+                              className="inline-flex items-center px-3 py-1.5 border border-slate-200 shadow-xs text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                            >
+                              <Pencil className="w-4 h-4 mr-1.5" />
+                              {language === 'mr' ? 'संपादित करा' : 'Edit'}
+                            </button>
+                            {isDistrictController && (
+                              <button
+                                onClick={() => setFormToDelete({ id: form.id, name: form.name })}
+                                className="inline-flex items-center px-3 py-1.5 border border-red-200 shadow-xs text-sm font-medium rounded-lg text-red-600 bg-white hover:bg-red-50 hover:border-red-300 transition-colors"
+                                title={language === 'mr' ? 'प्रपत्र पूर्णपणे हटवा' : 'Delete Form Completely'}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1.5 text-red-500" />
+                                {language === 'mr' ? 'हटवा' : 'Delete'}
+                              </button>
+                            )}
+                          </div>
                       </div>
                     ))}
                   </div>
@@ -1473,6 +1519,18 @@ export default function FormBuilder() {
               </>
             )}
           </button>
+
+          {loadedFormId && isDistrictController && (
+            <button 
+              type="button"
+              onClick={() => setFormToDelete({ id: loadedFormId, name: formName || 'Form' })}
+              className="inline-flex items-center px-3.5 py-2 border border-red-200 shadow-xs text-sm font-semibold rounded-lg text-red-600 bg-white hover:bg-red-50 hover:border-red-300 transition-colors"
+              title={language === 'mr' ? 'प्रपत्र पूर्णपणे हटवा' : 'Delete Form Completely'}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4 text-red-500" />
+              {language === 'mr' ? 'प्रपत्र हटवा' : 'Delete Form'}
+            </button>
+          )}
 
           <button 
             type="button"
@@ -1956,6 +2014,70 @@ export default function FormBuilder() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Delete Form Confirmation Modal */}
+      {formToDelete && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-red-100 transform transition-all animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {language === 'mr' ? 'प्रपत्र पूर्णपणे हटवा?' : 'Completely Delete Form?'}
+                </h3>
+                <p className="text-xs text-red-600 font-medium">
+                  {language === 'mr' ? 'जिल्हा नियंत्रक विशेषाधिकार' : 'District Controller Privilege'}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 text-xs text-red-900 leading-relaxed space-y-2">
+              <p className="font-semibold text-slate-900">
+                {language === 'mr' ? 'प्रपत्राचे नाव:' : 'Form Name:'} <span className="text-red-700">{formToDelete.name}</span>
+              </p>
+              <p>
+                {language === 'mr'
+                  ? '⚠️ हे प्रपत्र, त्याचे सर्व निर्देशक, सूत्रे व क्षेत्रीय कर्मचाऱ्यांनी सादर केलेला संबंधित सर्व जुना डेटा कायमस्वरूपी नष्ट केला जाईल.'
+                  : '⚠️ This will permanently erase this form, all its indicator definitions, calculation formulas, and all previously submitted data.'}
+              </p>
+              <p className="font-bold text-red-700">
+                {language === 'mr' ? 'ही क्रिया पूर्ववत करता येत नाही!' : 'This action cannot be undone!'}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setFormToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {language === 'mr' ? 'रद्द करा' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    {language === 'mr' ? 'हटवत आहे...' : 'Deleting...'}
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {language === 'mr' ? 'होय, पूर्णपणे हटवा' : 'Yes, Delete Completely'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
