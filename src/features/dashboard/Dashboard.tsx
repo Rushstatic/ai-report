@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [subcentreChartData, setSubcentreChartData] = useState<any[]>([]);
   const [pendingList, setPendingList] = useState<any[]>([]);
+  const [approvalPendingList, setApprovalPendingList] = useState<any[]>([]);
 
   // Employee Sub-centre specific stats
   const [subcentreVillagesCount, setSubcentreVillagesCount] = useState(0);
@@ -208,6 +209,10 @@ export default function Dashboard() {
 
           // 6. Set pending/overdue records
           setPendingList(pendingSubs.slice(0, 10));
+          
+          // 7. Set approval pending records
+          const toApproveSubs = subs.filter(s => s.status === 'Submitted');
+          setApprovalPendingList(toApproveSubs.slice(0, 20));
 
         } else {
           // Employee / Sub-centre level data
@@ -723,6 +728,64 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Reports Pending Approval for PHC Controller */}
+      {employee?.employee_type === 'PHC_CONTROLLER' && (
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="font-bold text-slate-800">
+                {language === 'mr' ? 'मंजुरीसाठी प्रलंबित अहवाल' : 'Reports Pending for Approval'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">End-user submissions waiting for your approval</p>
+            </div>
+            <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-md border border-blue-200/60">
+              {approvalPendingList.length} Pending
+            </span>
+          </div>
+          <div className="flex-1 overflow-auto max-h-[300px]">
+            {approvalPendingList.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs italic">
+                {language === 'mr' ? 'मंजुरीसाठी कोणतेही अहवाल प्रलंबित नाहीत.' : 'No reports pending for approval.'}
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="sticky top-0 bg-white border-b border-slate-100 z-5">
+                  <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    <th className="px-4 py-3">{t('dash.colPhc')}</th>
+                    <th className="px-4 py-3">{t('dash.colEmployee')}</th>
+                    <th className="px-4 py-3">Report Type</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs divide-y divide-slate-50">
+                  {approvalPendingList.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        {item.employees?.sub_centres?.name || item.employees?.phcs?.name || 'Sub-centre'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.employees?.name || 'Staff'} <span className="text-[10px] text-slate-400">({item.employees?.employee_type || 'MPW'})</span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.forms?.name || 'Report'} <span className="text-[10px] text-slate-400">({item.period_start})</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => navigate(`/reports/submit/${item.form_id}/${item.id}`)}
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-semibold rounded transition-colors"
+                        >
+                          Review & Approve
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Sub-centre Performance Chart */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col">
